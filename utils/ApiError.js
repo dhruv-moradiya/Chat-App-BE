@@ -14,7 +14,7 @@ const createError = {
   unauthorized: (message = "Unauthorized") => new ApiError(401, message),
   forbidden: (message = "Forbidden") => new ApiError(403, message),
   notFound: (message = "Not Found") => new ApiError(404, message),
-  wrongPassword: (message = "Wrong Password") => new ApiError(422, message),
+  wrongPassword: (message = "Wrong Password") => new ApiError(401, message),
   wrongData: (message = "Invalid or Incorrect Data") =>
     new ApiError(422, message),
   other: (message = "An Error Occurred") => new ApiError(500, message),

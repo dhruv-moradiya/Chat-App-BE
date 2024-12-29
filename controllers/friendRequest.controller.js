@@ -30,6 +30,11 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
         to: new mongoose.Types.ObjectId(receiverId),
       },
     },
+    {
+      $project: {
+        __v: 0,
+      },
+    },
   ]);
 
   if (existingFriendRequest.length > 0) {

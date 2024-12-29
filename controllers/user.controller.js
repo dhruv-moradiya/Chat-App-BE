@@ -50,9 +50,18 @@ const createUser = asyncHandler(async (req, res) => {
     throw createError.internalServerError("Failed to create user");
   }
 
+  const userResponse = {
+    _id: user._id,
+    username: user.username,
+    email: user.email,
+    profilePicture: user.profilePicture,
+  };
+
   return res
     .status(201)
-    .json(new ApiResponse(201, user, "User created successfully"));
+    .json(
+      new ApiResponse(201, { user: userResponse }, "User created successfully")
+    );
 });
 
 // LOGIN USER
@@ -210,6 +219,7 @@ const getUsersExcludingFriendsBasedOnSearch = asyncHandler(async (req, res) => {
         isFriends: 0,
         refreshToken: 0,
         password: 0,
+        __v: 0,
       },
     },
   ]);
