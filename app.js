@@ -3,8 +3,23 @@ import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { errorMiddleware } from "./middleware/error.middleware.js";
+import http from "http";
+import { Server } from "socket.io";
+import { initializeSocket } from "./socket/index.js";
 
 const app = express();
+
+const httpServer = http.createServer(app);
+
+const io = new Server(httpServer, {
+  pingTimeout: 60000,
+  cors: {
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  },
+});
+
+app.set("io", io);
 
 dotenv.config({
   path: ".env",
@@ -32,6 +47,8 @@ import FriendRequestRoute from "./routes/friendrequest.routes.js";
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/friendrequest", FriendRequestRoute);
+
+initializeSocket(io);
 
 app.use((err, req, res, next) => {
   errorMiddleware(err, req, res, next);
