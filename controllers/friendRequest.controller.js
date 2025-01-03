@@ -210,6 +210,7 @@ const getMyFriendRequest = asyncHandler(async (req, res) => {
     },
     {
       $project: {
+        to: 0,
         "from.password": 0,
         "from.refreshToken": 0,
         "from.__v": 0,

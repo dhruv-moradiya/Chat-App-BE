@@ -2,40 +2,34 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { errorMiddleware } from "./middleware/error.middleware.js";
 import http from "http";
 import { Server } from "socket.io";
 import { initializeSocket } from "./socket/index.js";
 
-const app = express();
+dotenv.config();
 
+const app = express();
 const httpServer = http.createServer(app);
 
+// Configure Socket.IO
 const io = new Server(httpServer, {
-  pingTimeout: 60000,
   cors: {
-    origin: ["http://localhost:5173"],
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
+// Attach Socket.IO to the app
 app.set("io", io);
 
-dotenv.config({
-  path: ".env",
-});
-
-app.use(
-  cors({
-    credentials: true,
-    origin: ["http://localhost:5173"],
-  })
-);
+// Middleware
+app.use(cors({ credentials: true, origin: ["http://localhost:5173"] }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public/temp"));
 app.use(cookieParser());
 
+// Routes
 app.get("/", (req, res) => {
   res.send("Welcome to the File Chat App Backend!");
 });
@@ -48,10 +42,14 @@ app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/friendrequest", FriendRequestRoute);
 
+// Socket.IO Initialization
 initializeSocket(io);
 
+// Error Handling Middleware
 app.use((err, req, res, next) => {
-  errorMiddleware(err, req, res, next);
+  res
+    .status(err.status || 500)
+    .json({ message: err.message || "Internal Server Error" });
 });
 
-export { app };
+export { app, httpServer };

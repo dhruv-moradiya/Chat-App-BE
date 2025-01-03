@@ -27,13 +27,15 @@ const mountParticipantStopTypingEvent = (socket) => {
 const initializeSocket = (io) => {
   console.log("SOCKET INITIALIZED RUN.");
 
-  return io.on(ChatEventEnum.CONNECTED_EVENT, async (socket) => {
+  return io.on("connection", async (socket) => {
+    console.log("User connected 🙏.", socket.id);
+    socket.emit(ChatEventEnum.CONNECTED_EVENT, {
+      message: "Socket connected successfully",
+    });
     try {
-      console.log("SOCKET CONNECTED RUN.");
       const cookies = cookie.parse(socket.handshake.headers.cookie || "");
 
       let token = cookies.token;
-
       if (!token) {
         token = socket.handshake.auth.token;
       }
@@ -43,7 +45,6 @@ const initializeSocket = (io) => {
       }
 
       const decoded = await jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-
       const user = await User.findOne({ _id: decoded._id }).select(
         "-password -refreshToken -__v"
       );
