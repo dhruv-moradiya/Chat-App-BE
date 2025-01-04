@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
-import FriendRequest from "../models/friendrequest.model.js";
 import User from "../models/user.model.js";
-import { createError } from "../utils/ApiError.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
 import Chat from "../models/chat.model.js";
+import FriendRequest from "../models/friendrequest.model.js";
+import { createError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 import { ChatEventEnum } from "../constants/index.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 // SEND FRIEND REQUEST
 const sendFriendRequest = asyncHandler(async (req, res) => {
@@ -85,37 +85,32 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
 const acceptFriendRequest = asyncHandler(async (req, res) => {
   const { friendRequestId } = req.body;
 
-  // Validate friendRequestId
   if (!mongoose.Types.ObjectId.isValid(friendRequestId)) {
     throw createError.badRequest("Invalid friend request ID");
   }
 
-  // Fetch friend request
   const friendRequest = await FriendRequest.findById(friendRequestId);
   if (!friendRequest) {
     throw createError.notFound("Friend request not found");
   }
 
-  // Authorization check
   if (friendRequest.to.toString() !== req.user._id.toString()) {
     throw createError.forbidden(
       "You are not authorized to accept this request"
     );
   }
 
-  // Check friend request status
   if (friendRequest.status !== "pending") {
     throw createError.badRequest("Friend request already accepted or rejected");
   }
 
-  // Accept the friend request
-  friendRequest.status = "accepted";
-  await friendRequest.save();
-
-  // Add friends and create chat (using transaction)
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
+
+    // Update friend request status
+    friendRequest.status = "accepted";
+    await friendRequest.save({ session });
 
     // Fetch users
     const [user, friendRequestSender] = await Promise.all([
@@ -139,28 +134,67 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
     // Delete the friend request
     await FriendRequest.deleteOne({ _id: friendRequest._id }, { session });
 
-    // Create a chat between the two users
-    const chat = await Chat.create(
+    // Create a chat
+    const chat = new Chat({
+      participants: [user._id, friendRequestSender._id],
+      messages: [],
+      isGroup: false,
+    });
+    await chat.save({ session });
+
+    const chatDetails = await Chat.aggregate(
       [
+        { $match: { _id: chat._id } },
         {
-          participants: [user._id, friendRequestSender._id],
-          messages: [],
-          isGroup: false,
+          $lookup: {
+            from: "users",
+            localField: "participants",
+            foreignField: "_id",
+            as: "participants",
+          },
+        },
+        {
+          $project: {
+            __v: 0,
+            messages: 0,
+            "participants.refreshToken": 0,
+            "participants.__v": 0,
+            "participants.friends": 0,
+            "participants.mutedChats": 0,
+            "participants.createdAt": 0,
+            "participants.updatedAt": 0,
+          },
         },
       ],
-      { session }
+      { session } // Explicitly pass the session
     );
 
-    // Commit the transaction
+    // Commit transaction
     await session.commitTransaction();
 
-    // Respond with success
+    const acceptorDetails = {
+      _id: user._id,
+      username: user.username,
+      profilePicture: user.profilePicture,
+      email: user.email,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
+    req.app
+      .get("io")
+      .to(friendRequest.from.toString())
+      .emit(ChatEventEnum.FRIEND_REQUEST_ACCEPT_EVENT, {
+        acceptorDetails,
+        chatDetails: chatDetails[0],
+      });
+
     res
       .status(200)
       .json(
         new ApiResponse(
           200,
-          { friendRequest, chat },
+          { acceptorDetails, chatDetails: chatDetails[0] },
           "Friend request accepted successfully"
         )
       );
