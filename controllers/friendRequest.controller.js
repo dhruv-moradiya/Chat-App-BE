@@ -7,6 +7,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import Chat from "../models/chat.model.js";
 import { ChatEventEnum } from "../constants/index.js";
 
+// SEND FRIEND REQUEST
 const sendFriendRequest = asyncHandler(async (req, res) => {
   const { receiverId } = req.body;
 
@@ -80,6 +81,7 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     );
 });
 
+// ACCEPT FRIEND REQUEST
 const acceptFriendRequest = asyncHandler(async (req, res) => {
   const { friendRequestId } = req.body;
 
@@ -170,6 +172,7 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
   }
 });
 
+// REJECT FRIEND REQUEST
 const rejectFriendRequest = asyncHandler(async (req, res) => {
   const { friendRequestId } = req.body;
 
@@ -208,6 +211,7 @@ const rejectFriendRequest = asyncHandler(async (req, res) => {
     );
 });
 
+// GET MY FRIEND REQUEST
 const getMyFriendRequest = asyncHandler(async (req, res) => {
   const currentUserId = new mongoose.Types.ObjectId(req.user._id);
 

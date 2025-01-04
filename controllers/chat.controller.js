@@ -58,7 +58,9 @@ const getMyChats = asyncHandler(async (req, res) => {
     {
       $match: {
         participants: {
-          $elemMatch: { $eq: new mongoose.Types.ObjectId(req.user._id) },
+          $elemMatch: {
+            $eq: new mongoose.Types.ObjectId(req.user._id),
+          },
         },
       },
     },
@@ -72,10 +74,14 @@ const getMyChats = asyncHandler(async (req, res) => {
     },
     {
       $project: {
-        participants: {
-          refreshToken: 0,
-          password: 0,
-        },
+        __v: 0,
+        messages: 0,
+        "participants.refreshToken": 0,
+        "participants.__v": 0,
+        "participants.friends": 0,
+        "participants.mutedChats": 0,
+        "participants.createdAt": 0,
+        "participants.updatedAt": 0,
       },
     },
   ]);
