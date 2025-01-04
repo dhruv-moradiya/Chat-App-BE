@@ -5,6 +5,7 @@ import { createError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import Chat from "../models/chat.model.js";
+import { ChatEventEnum } from "../constants/index.js";
 
 const sendFriendRequest = asyncHandler(async (req, res) => {
   const { receiverId } = req.body;
@@ -49,6 +50,28 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
   if (!friendRequest) {
     throw createError.internalServerError("Friend request could not be sent");
   }
+
+  const dataToEmit = {
+    from: {
+      username: req.user.username,
+      _id: req.user._id,
+      profilePicture: req.user.profilePicture,
+      email: req.user.email,
+    },
+    _id: friendRequest._id,
+    status: friendRequest.status,
+    updatedAt: friendRequest.updatedAt,
+    createdAt: friendRequest.createdAt,
+  };
+
+  console.log(`Emitting FRIEND_REQUEST_RECEIVE_EVENT to room ${receiverId}`);
+  req.app
+    .get("io")
+    .to(receiverId.toString())
+    .emit(ChatEventEnum.FRIEND_REQUEST_RECEIVE_EVENT, {
+      data: dataToEmit,
+      message: "You have a new friend request!",
+    });
 
   return res
     .status(201)
@@ -211,12 +234,14 @@ const getMyFriendRequest = asyncHandler(async (req, res) => {
     {
       $project: {
         to: 0,
+        __v: 0,
         "from.password": 0,
         "from.refreshToken": 0,
         "from.__v": 0,
-        __v: 0,
         "from.friends": 0,
         "from.mutedChats": 0,
+        "from.createdAt": 0,
+        "from.updatedAt": 0,
       },
     },
   ]);

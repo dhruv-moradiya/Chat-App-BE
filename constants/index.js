@@ -58,6 +58,7 @@ const ChatEventEnum = Object.freeze({
 
   // Friend requests
   FRIEND_REQUEST_SEND_EVENT: "friendRequestSent",
+  FRIEND_REQUEST_RECEIVE_EVENT: "friendRequestReceived",
   FRIEND_REQUEST_ACCEPT_EVENT: "friendRequestAccepted",
   FRIEND_REQUEST_DECLINE_EVENT: "friendRequestDeclined",
 });

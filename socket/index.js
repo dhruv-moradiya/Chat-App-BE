@@ -1,5 +1,6 @@
 import cookie from "cookie";
 import jwt from "jsonwebtoken";
+import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { ChatEventEnum } from "../constants/index.js";
 
@@ -28,10 +29,6 @@ const initializeSocket = (io) => {
   console.log("SOCKET INITIALIZED RUN.");
 
   return io.on("connection", async (socket) => {
-    console.log("User connected 🙏.", socket.id);
-    socket.emit(ChatEventEnum.CONNECTED_EVENT, {
-      message: "Socket connected successfully",
-    });
     try {
       const cookies = cookie.parse(socket.handshake.headers.cookie || "");
 
@@ -53,16 +50,23 @@ const initializeSocket = (io) => {
         throw new ApiError(401, "Un-authorized handshake. User is missing");
       }
 
+      socket.join(user._id.toString());
+      console.log(`User joined room: ${user._id.toString()}`);
       socket.user = user;
 
-      socket.join(user._id.toString());
-
-      socket.emit(ChatEventEnum.CONNECTED_EVENT);
+      socket.emit(
+        ChatEventEnum.CONNECTED_EVENT,
+        `${user.username} is connected successfully.`
+      );
       console.log(
         `User connected 🗼. userId: ${user._id.toString()} and username ${
           user.username
         }`
       );
+
+      socket.emit("TEST_EVENT", {
+        message: "Emit Test Event.",
+      });
 
       mountJoinChatEvent(socket);
       mountParticipantTypingEvent(socket);
@@ -80,6 +84,7 @@ const initializeSocket = (io) => {
         }
       });
     } catch (error) {
+      console.log("error :>> ", error);
       socket.emit(
         ChatEventEnum.SOCKET_ERROR_EVENT,
         error?.message || "Something went wrong while connecting the socket"
