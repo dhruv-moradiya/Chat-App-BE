@@ -45,6 +45,12 @@ const ChatEventEnum = Object.freeze({
   CHAT_UNPIN_EVENT: "chatUnpinned",
   CHAT_MUTE_EVENT: "chatMuted",
   CHAT_UNMUTE_EVENT: "chatUnmuted",
+  CURRENT_ACTIVE_CHAT_EVENT: "currentActiveChat",
+
+  // Room creation
+  ROOM_CREATED_EVENT: "roomCreated",
+  JOIN_ROOM_EVENT: "joinRoom",
+  LEAVE_ROOM_EVENT: "leaveRoom",
 
   // Media
   MEDIA_SEND_EVENT: "mediaSent",

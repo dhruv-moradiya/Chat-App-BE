@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { logger } from "../utils/logger.js";
 
 const connectDB = async () => {
   try {
@@ -6,12 +7,12 @@ const connectDB = async () => {
       dbName: process.env.DATABASE_NAME,
     });
 
-    console.log(
+    logger.success(
       "😍 Database connected successfully",
       connectionInstance.connection.host
     );
   } catch (err) {
-    console.error("❌ Database connection failed", err.message);
+    logger.error("❌ Database connection failed", err.message);
     process.exit(1);
   }
 };

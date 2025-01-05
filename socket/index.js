@@ -3,6 +3,11 @@ import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import { ChatEventEnum } from "../constants/index.js";
+import { logger } from "../utils/logger.js";
+
+const emitError = (socket, error) => {
+  socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, error);
+};
 
 const mountJoinChatEvent = (socket) => {
   socket.on(ChatEventEnum.JOIN_CHAT_EVENT, (chatId) => {
@@ -23,6 +28,41 @@ const mountParticipantStopTypingEvent = (socket) => {
     console.log(`User stopped typing. chatId: `, chatId);
     socket.to(chatId).emit(ChatEventEnum.STOP_TYPING_EVENT, chatId);
   });
+};
+
+const listenForCurrentActiveChat = (io, socket) => {
+  socket.on(
+    ChatEventEnum.CURRENT_ACTIVE_CHAT_EVENT,
+    ({ chatId, participants }) => {
+      // TODO: Add validation for chatId and participants
+      if (
+        !chatId ||
+        !Array.isArray(participants) ||
+        participants.length === 0
+      ) {
+        logger.error("Chat ID and participants are required");
+        return;
+      }
+
+      participants.forEach((user) => {
+        io.to(user._id).socketsJoin(chatId);
+        logger.info(
+          `A User with ID: ${user._id} Username: ${user.username} added to chat room: ${chatId}`
+        );
+      });
+
+      io.to(chatId).emit(ChatEventEnum.ROOM_CREATED_EVENT, {
+        chatId,
+        participants,
+      });
+
+      const participantsName = participants.map((p) => p.username).join(" | ");
+
+      logger.info(
+        `Room ${chatId} created with participants: ${participantsName}`
+      );
+    }
+  );
 };
 
 const initializeSocket = (io) => {
@@ -51,18 +91,13 @@ const initializeSocket = (io) => {
       }
 
       socket.join(user._id.toString());
-      console.log(`User joined room: ${user._id.toString()}`);
       socket.user = user;
 
       socket.emit(
         ChatEventEnum.CONNECTED_EVENT,
         `${user.username} is connected successfully.`
       );
-      console.log(
-        `User connected 🗼. userId: ${user._id.toString()} and username ${
-          user.username
-        }`
-      );
+      logger.info(`✨ ${user.username} is connected successfully.`);
 
       socket.emit("TEST_EVENT", {
         message: "Emit Test Event.",
@@ -71,10 +106,11 @@ const initializeSocket = (io) => {
       mountJoinChatEvent(socket);
       mountParticipantTypingEvent(socket);
       mountParticipantStopTypingEvent(socket);
+      listenForCurrentActiveChat(io, socket);
 
       socket.on(ChatEventEnum.DISCONNECT_EVENT, () => {
-        console.log(
-          `User disconnected 🚫. userId: ${user._id.toString()} and username ${
+        logger.info(
+          `🚫 User disconnected ID: ${user._id.toString()} Username: ${
             user.username
           }`
         );
@@ -84,7 +120,7 @@ const initializeSocket = (io) => {
         }
       });
     } catch (error) {
-      console.log("error :>> ", error);
+      logger.error(error);
       socket.emit(
         ChatEventEnum.SOCKET_ERROR_EVENT,
         error?.message || "Something went wrong while connecting the socket"
