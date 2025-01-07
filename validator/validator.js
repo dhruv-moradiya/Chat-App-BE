@@ -99,6 +99,18 @@ const getUsersExcludingFriendsBasedOnSearchValidator = () => {
   ];
 };
 
+const createMessageValidator = () => {
+  return [
+    body("chatId")
+      .trim()
+      .notEmpty()
+      .withMessage("Chat id is required")
+      .isMongoId()
+      .withMessage("Chat id is invalid"),
+    body("content").trim().notEmpty().withMessage("Content is required"),
+  ];
+};
+
 export {
   validate,
   userRegisterValidator,
@@ -107,4 +119,5 @@ export {
   sendFriendRequestValidator,
   acceptOrRejectFriendRequestValidator,
   getUsersExcludingFriendsBasedOnSearchValidator,
+  createMessageValidator,
 };

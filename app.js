@@ -6,7 +6,9 @@ import http from "http";
 import { Server } from "socket.io";
 import { initializeSocket } from "./socket/index.js";
 
-dotenv.config();
+// dotenv.config({
+//   path: "./.env",
+// });
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -37,10 +39,12 @@ app.get("/", (req, res) => {
 import userRoutes from "./routes/user.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import FriendRequestRoute from "./routes/friendrequest.routes.js";
+import MessagesRoute from "./routes/message.routes.js";
 
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/friendrequest", FriendRequestRoute);
+app.use("/api/v1/message", MessagesRoute);
 
 // Socket.IO Initialization
 initializeSocket(io);

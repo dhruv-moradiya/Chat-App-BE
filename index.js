@@ -3,7 +3,9 @@ import { connectDB } from "./db/index.js";
 import { httpServer } from "./app.js";
 import { logger } from "./utils/logger.js";
 
-dotenv.config();
+dotenv.config({
+  path: "./.env",
+});
 
 connectDB()
   .then(() => {

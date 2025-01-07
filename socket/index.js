@@ -66,8 +66,6 @@ const listenForCurrentActiveChat = (io, socket) => {
 };
 
 const initializeSocket = (io) => {
-  console.log("SOCKET INITIALIZED RUN.");
-
   return io.on("connection", async (socket) => {
     try {
       const cookies = cookie.parse(socket.handshake.headers.cookie || "");
