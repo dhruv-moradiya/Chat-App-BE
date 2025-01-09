@@ -30,39 +30,32 @@ const mountParticipantStopTypingEvent = (socket) => {
   });
 };
 
+const listenForLeaveChatEvent = (io, socket) => {
+  socket.on(ChatEventEnum.LEAVE_CHAT_EVENT, (chatId) => {
+    console.log(`User left the chat. chatId: `, chatId);
+    socket.leave(chatId);
+  });
+};
+
 const listenForCurrentActiveChat = (io, socket) => {
-  socket.on(
-    ChatEventEnum.CURRENT_ACTIVE_CHAT_EVENT,
-    ({ chatId, participants }) => {
-      // TODO: Add validation for chatId and participants
-      if (
-        !chatId ||
-        !Array.isArray(participants) ||
-        participants.length === 0
-      ) {
-        logger.error("Chat ID and participants are required");
-        return;
-      }
-
-      participants.forEach((user) => {
-        io.to(user._id).socketsJoin(chatId);
-        logger.info(
-          `A User with ID: ${user._id} Username: ${user.username} added to chat room: ${chatId}`
-        );
-      });
-
-      io.to(chatId).emit(ChatEventEnum.ROOM_CREATED_EVENT, {
-        chatId,
-        participants,
-      });
-
-      const participantsName = participants.map((p) => p.username).join(" | ");
-
-      logger.info(
-        `Room ${chatId} created with participants: ${participantsName}`
-      );
+  socket.on(ChatEventEnum.CURRENT_ACTIVE_CHAT_EVENT, ({ chatId, userData }) => {
+    // TODO: Add validation for chatId and userData
+    if (!chatId || !userData?._id || !userData?.username) {
+      logger.error("Chat ID and user data are required.");
+      return;
     }
-  );
+
+    const userId = userData._id;
+    const userName = userData.username;
+
+    io.to(userId).socketsJoin(chatId);
+    logger.info(`${userName} joined to chat room: ${chatId}`);
+
+    io.to(chatId).emit(ChatEventEnum.ROOM_CREATED_EVENT, {
+      chatId,
+      userName,
+    });
+  });
 };
 
 const initializeSocket = (io) => {
@@ -104,6 +97,7 @@ const initializeSocket = (io) => {
       mountJoinChatEvent(socket);
       mountParticipantTypingEvent(socket);
       mountParticipantStopTypingEvent(socket);
+      listenForLeaveChatEvent(io, socket);
       listenForCurrentActiveChat(io, socket);
 
       socket.on(ChatEventEnum.DISCONNECT_EVENT, () => {

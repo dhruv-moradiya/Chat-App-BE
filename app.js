@@ -6,10 +6,6 @@ import http from "http";
 import { Server } from "socket.io";
 import { initializeSocket } from "./socket/index.js";
 
-// dotenv.config({
-//   path: "./.env",
-// });
-
 const app = express();
 const httpServer = http.createServer(app);
 

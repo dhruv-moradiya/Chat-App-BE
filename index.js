@@ -1,11 +1,11 @@
 import dotenv from "dotenv";
-import { connectDB } from "./db/index.js";
-import { httpServer } from "./app.js";
-import { logger } from "./utils/logger.js";
-
 dotenv.config({
   path: "./.env",
 });
+
+import { connectDB } from "./db/index.js";
+import { httpServer } from "./app.js";
+import { logger } from "./utils/logger.js";
 
 connectDB()
   .then(() => {
