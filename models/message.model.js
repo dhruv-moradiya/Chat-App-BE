@@ -8,7 +8,19 @@ const MessageSchema = new mongoose.Schema(
       required: true,
     },
     content: { type: String },
-    attachments: [{ type: String }],
+    attachments: [
+      {
+        url: {
+          type: String,
+        },
+        fileName: {
+          type: String,
+        },
+        publicId: {
+          type: String,
+        },
+      },
+    ],
     reactions: [
       {
         emoji: { type: String },

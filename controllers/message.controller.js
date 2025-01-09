@@ -6,7 +6,7 @@ import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 import { createError } from "../utils/ApiError.js";
 
 const createMessage = asyncHandler(async (req, res) => {
-  const { chatId, content } = req.body;
+  const { chatId, content, replyTo } = req.body;
   const senderId = req.user._id;
 
   const attachments = req.files?.attachments;
@@ -23,7 +23,7 @@ const createMessage = asyncHandler(async (req, res) => {
       publicIds
     );
 
-    attachmentsData = uploadedFiles.map((file) => ({
+    attachmentsData = uploadedFiles?.map((file) => ({
       url: file.secure_url,
       fileName: file.original_filename,
       publicId: file.public_id,
@@ -35,6 +35,7 @@ const createMessage = asyncHandler(async (req, res) => {
     chat: chatId,
     content,
     ...(attachmentsData.length && { attachments: attachmentsData }),
+    ...(replyTo && { replyTo }),
   };
 
   const message = await Message.create(newMessageData);

@@ -1,3 +1,4 @@
+import fs from "fs";
 import { v2 as cloudinary } from "cloudinary";
 
 const configureCloudinary = () => {
@@ -22,7 +23,6 @@ const uploadFilesToCloudinary = async (filePaths, userName, publicIds = []) => {
     });
 
     const responses = await Promise.all(uploadPromises);
-
     filePaths.forEach((localPath) => {
       try {
         fs.unlinkSync(localPath);
