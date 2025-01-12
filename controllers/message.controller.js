@@ -4,6 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 import { createError } from "../utils/ApiError.js";
+import { ChatEventEnum } from "../constants/index.js";
 
 const createMessage = asyncHandler(async (req, res) => {
   const { chatId, content, replyTo } = req.body;
@@ -39,6 +40,8 @@ const createMessage = asyncHandler(async (req, res) => {
   };
 
   const message = await Message.create(newMessageData);
+  const messageObject = message.toObject();
+  delete messageObject.__v;
 
   if (!message) {
     throw createError.internalServerError("Failed to create message");
@@ -47,6 +50,17 @@ const createMessage = asyncHandler(async (req, res) => {
   const messageResponse = {
     _id: message._id,
   };
+
+  const messageResponseForSocket = {
+    ...message.toObject(),
+  };
+
+  req.app
+    .get("io")
+    .to(chatId.toString())
+    .emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
+      message: messageResponseForSocket,
+    });
 
   res
     .status(201)
@@ -72,7 +86,7 @@ const getMyMessages = asyncHandler(async (req, res) => {
 const getMessagesBasedOnChatId = asyncHandler(async (req, res, next) => {
   try {
     const { chatId } = req.params;
-    let { page = 1, limit = 10 } = req.query;
+    let { page = 1, limit = 20 } = req.query;
 
     page = parseInt(page, 10);
     limit = parseInt(limit, 10);

@@ -9,13 +9,6 @@ const emitError = (socket, error) => {
   socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, error);
 };
 
-const mountJoinChatEvent = (socket) => {
-  socket.on(ChatEventEnum.JOIN_CHAT_EVENT, (chatId) => {
-    console.log(`User joined the chat 🤝. chatId: `, chatId);
-    socket.join(chatId);
-  });
-};
-
 const mountParticipantTypingEvent = (socket) => {
   socket.on(ChatEventEnum.TYPING_EVENT, (chatId) => {
     console.log(`User is typing. chatId: `, chatId);
@@ -94,7 +87,6 @@ const initializeSocket = (io) => {
         message: "Emit Test Event.",
       });
 
-      mountJoinChatEvent(socket);
       mountParticipantTypingEvent(socket);
       mountParticipantStopTypingEvent(socket);
       listenForLeaveChatEvent(io, socket);

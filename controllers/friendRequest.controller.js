@@ -139,6 +139,10 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
       participants: [user._id, friendRequestSender._id],
       messages: [],
       isGroup: false,
+      unreadMessagesCounts: new Map([
+        [user._id, 0],
+        [friendRequestSender._id, 0],
+      ]),
     });
     await chat.save({ session });
 
