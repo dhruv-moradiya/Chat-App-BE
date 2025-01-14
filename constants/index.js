@@ -46,6 +46,8 @@ const ChatEventEnum = Object.freeze({
   CHAT_MUTE_EVENT: "chatMuted",
   CHAT_UNMUTE_EVENT: "chatUnmuted",
   CURRENT_ACTIVE_CHAT_EVENT: "currentActiveChat",
+  UNREAD_MESSAGE_EVENT: "unreadMessage",
+  UNREAD_MESSAGE_COUNT_EVENT: "unreadMessageCount",
 
   // Room creation
   ROOM_CREATED_EVENT: "roomCreated",

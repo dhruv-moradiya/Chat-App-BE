@@ -37,6 +37,15 @@ const logger = {
     });
     console.log(`${formattedTime} ${chalk.red.bold("ERROR:")} ${message}`);
   },
+  debug: (message) => {
+    const formattedTime = new Date().toLocaleString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+    console.log(`${formattedTime} ${chalk.magenta.bold("DEBUG:")} ${message}`);
+  },
 };
 
 export { logger };

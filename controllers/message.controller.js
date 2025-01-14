@@ -5,6 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 import { createError } from "../utils/ApiError.js";
 import { ChatEventEnum } from "../constants/index.js";
+import { emitEventForNewMessageReceived } from "../socket/index.js";
 
 const createMessage = asyncHandler(async (req, res) => {
   const { chatId, content, replyTo } = req.body;
@@ -55,12 +56,11 @@ const createMessage = asyncHandler(async (req, res) => {
     ...message.toObject(),
   };
 
-  req.app
-    .get("io")
-    .to(chatId.toString())
-    .emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
-      message: messageResponseForSocket,
-    });
+  emitEventForNewMessageReceived(
+    req.app.get("io"),
+    chatId,
+    messageResponseForSocket
+  );
 
   res
     .status(201)
