@@ -4,6 +4,7 @@ import User from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { createError } from "../utils/ApiError.js";
+import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 
 const createOneOnOneChat = asyncHandler(async (req, res) => {
   const { receiverId, chatName } = req.body;
@@ -50,7 +51,134 @@ const createOneOnOneChat = asyncHandler(async (req, res) => {
     throw createError.internalServerError("Chat creation failed");
   }
 
-  res.status(201).json(new ApiResponse(201, chat, "Chat created successfully"));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, chat, "Chat created successfully"));
+});
+
+const createGroupChat = asyncHandler(async (req, res) => {
+  const { chatName, participantIds, coverImage } = req.body;
+
+  const isAllParticipantsExistInFriendArray = await User.aggregate([
+    {
+      $match: {
+        _id: {
+          $eq: new mongoose.Types.ObjectId(req.user._id),
+        },
+      },
+    },
+    {
+      $addFields: {
+        missingIds: { $setDifference: [[participantIds], "$friends"] },
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        missingIds: 1,
+      },
+    },
+  ]);
+
+  const missingIds = isAllParticipantsExistInFriendArray[0].missingIds;
+  if (missingIds[0].length > 0) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          { missingIds: missingIds[0] },
+          "Participant ids not found in friends list"
+        )
+      );
+  }
+
+  const participantsArray = participantIds.map(
+    (id) => new mongoose.Types.ObjectId(id)
+  );
+  participantsArray.push(req.user._id);
+
+  const isChatExist = await Chat.aggregate([
+    {
+      $match: {
+        participants: {
+          $all: participantsArray,
+        },
+      },
+    },
+  ]);
+
+  if (isChatExist.length > 0) {
+    throw createError.badRequest("Chat already exist");
+  }
+
+  let coverImagePath;
+  let coverImagePublicId;
+  if (req.files && req.files.coverImage && req.files.coverImage.length > 0) {
+    coverImagePath = req.files.coverImage[0].path;
+    coverImagePublicId = req.files.coverImage[0].originalname;
+  }
+
+  let coverImageData;
+  if (coverImagePath && coverImagePublicId) {
+    const { secure_url: url, public_id: publicId } = uploadFilesToCloudinary(
+      [coverImagePath],
+      req.user.username,
+      [coverImagePublicId]
+    );
+
+    coverImageData = { url, fileName: coverImagePublicId, publicId };
+  }
+
+  const chat = await Chat.create({
+    participants: participantsArray,
+    chatName: chatName,
+    isGroup: true,
+    admin: req.user._id,
+    coverImage: coverImageData,
+  });
+
+  console.log("chat :>> ", chat);
+
+  if (!chat) {
+    throw createError.internalServerError("Chat creation failed");
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, chat, "Chat created successfully"));
+});
+
+const addParticipantInGroupChat = asyncHandler(async (req, res) => {
+  const { chatId, participantId } = req.body;
+
+  const chat = await Chat.findByIdAndUpdate(chatId, {
+    $push: { participants: participantId },
+  });
+
+  if (!chat) {
+    throw createError.internalServerError("Chat creation failed");
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, chat, "Participant added successfully"));
+});
+
+const removeParticipantFromGroupChat = asyncHandler(async (req, res) => {
+  const { chatId, participantId } = req.body;
+
+  const chat = await Chat.findByIdAndUpdate(chatId, {
+    $pull: { participants: participantId },
+  });
+
+  if (!chat) {
+    throw createError.internalServerError("Chat creation failed");
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, chat, "Participant removed successfully"));
 });
 
 const getMyChats = asyncHandler(async (req, res) => {
@@ -90,9 +218,15 @@ const getMyChats = asyncHandler(async (req, res) => {
     throw createError.notFound("No chats found");
   }
 
-  res
+  return res
     .status(200)
     .json(new ApiResponse(200, chats, "Chats fetched successfully"));
 });
 
-export { createOneOnOneChat, getMyChats };
+export {
+  createOneOnOneChat,
+  getMyChats,
+  createGroupChat,
+  addParticipantInGroupChat,
+  removeParticipantFromGroupChat,
+};

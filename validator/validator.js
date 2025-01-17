@@ -115,6 +115,37 @@ const createMessageValidator = () => {
   ];
 };
 
+const createGroupChatValidator = () => {
+  return [
+    body("chatName").trim().notEmpty().withMessage("Chat name is required"),
+    body("participantIds")
+      .isArray()
+      .withMessage("Participant ids must be an array of valid MongoDB IDs")
+      .isLength(2)
+      .withMessage("Participant ids must be an array of 2 valid MongoDB IDs"),
+    body("participantIds.*")
+      .isMongoId()
+      .withMessage("Participant ids must be an array of valid MongoDB IDs"),
+  ];
+};
+
+const addOrRemoveParticipantValidator = () => {
+  return [
+    body("chatId")
+      .trim()
+      .notEmpty()
+      .withMessage("Chat id is required")
+      .isMongoId()
+      .withMessage("Chat id is invalid"),
+    body("participantId")
+      .trim()
+      .notEmpty()
+      .withMessage("Participant id is required")
+      .isMongoId()
+      .withMessage("Participant id is invalid"),
+  ];
+};
+
 export {
   validate,
   userRegisterValidator,
@@ -124,4 +155,6 @@ export {
   acceptOrRejectFriendRequestValidator,
   getUsersExcludingFriendsBasedOnSearchValidator,
   createMessageValidator,
+  createGroupChatValidator,
+  addOrRemoveParticipantValidator,
 };

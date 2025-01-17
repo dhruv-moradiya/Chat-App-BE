@@ -303,9 +303,73 @@ const getMyFriendRequest = asyncHandler(async (req, res) => {
     );
 });
 
+const getMyFriendsList = asyncHandler(async (req, res) => {
+  const friends = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "friends",
+        foreignField: "_id",
+        as: "friends",
+      },
+    },
+    {
+      $unwind: {
+        path: "$friends",
+      },
+    },
+    {
+      $project: {
+        password: 0,
+        refreshToken: 0,
+        mutedChats: 0,
+        createdAt: 0,
+        password: 0,
+        updatedAt: 0,
+        __v: 0,
+        "friends.password": 0,
+        "friends.refreshToken": 0,
+        "friends.mutedChats": 0,
+        "friends.createdAt": 0,
+        "friends.updatedAt": 0,
+        "friends.__v": 0,
+        "friends.friends": 0,
+      },
+    },
+    {
+      $group: {
+        _id: "$_id",
+        friends: { $push: "$friends" },
+      },
+    },
+    {
+      $project: {
+        friends: 1,
+        _id: 0,
+      },
+    },
+  ]);
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { friends: friends[0].friends },
+        "Friend requests fetched successfully"
+      )
+    );
+});
+
 export {
   sendFriendRequest,
   acceptFriendRequest,
   rejectFriendRequest,
   getMyFriendRequest,
+  getMyFriendsList,
 };

@@ -2,6 +2,7 @@ import express from "express";
 import {
   acceptFriendRequest,
   getMyFriendRequest,
+  getMyFriendsList,
   rejectFriendRequest,
   sendFriendRequest,
 } from "../controllers/friendRequest.controller.js";
@@ -37,6 +38,8 @@ router.post(
   validate,
   rejectFriendRequest
 );
+
+router.get("/get-my-friends", verifyJWT, getMyFriendsList);
 
 router.get("/get-friend-requests", verifyJWT, getMyFriendRequest);
 
