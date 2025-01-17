@@ -1,5 +1,4 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import http from "http";
@@ -12,7 +11,7 @@ const httpServer = http.createServer(app);
 // Configure Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: `${process.env.CORS_ORIGIN}`,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -22,7 +21,7 @@ const io = new Server(httpServer, {
 app.set("io", io);
 
 // Middleware
-app.use(cors({ credentials: true, origin: ["http://localhost:5173"] }));
+app.use(cors({ credentials: true, origin: [`${process.env.CORS_ORIGIN}`] }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
