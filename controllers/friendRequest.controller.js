@@ -162,6 +162,7 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
             __v: 0,
             messages: 0,
             "participants.refreshToken": 0,
+            "participants.password": 0,
             "participants.__v": 0,
             "participants.friends": 0,
             "participants.mutedChats": 0,

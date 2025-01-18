@@ -32,19 +32,20 @@ const uploadFilesToCloudinary = async (filePaths, userName, publicIds = []) => {
     });
 
     console.log("Files uploaded successfully to Cloudinary");
+    console.log("responses :>> ", responses);
     return responses;
   } catch (error) {
     console.error("Error while uploading files to Cloudinary:", error.message);
-
     filePaths.forEach((localPath) => {
       try {
         fs.unlinkSync(localPath);
       } catch (err) {
         console.error(`Failed to delete local file: ${localPath}`, err.message);
+        throw err;
       }
     });
 
-    return null;
+    throw error;
   }
 };
 

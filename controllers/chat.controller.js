@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Mongoose } from "mongoose";
 import Chat from "../models/chat.model.js";
 import User from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -57,88 +57,104 @@ const createOneOnOneChat = asyncHandler(async (req, res) => {
 });
 
 const createGroupChat = asyncHandler(async (req, res) => {
-  const { chatName, participantIds, coverImage } = req.body;
+  const { chatName, participantIds } = req.body;
+
+  if (!Array.isArray(participantIds) || participantIds.length === 0) {
+    throw createError.badRequest("Participant IDs must be provided.");
+  }
+
+  const Ids = participantIds.map((id) => new mongoose.Types.ObjectId(id));
 
   const isAllParticipantsExistInFriendArray = await User.aggregate([
+    { $match: { _id: new mongoose.Types.ObjectId(req.user._id) } },
     {
-      $match: {
-        _id: {
-          $eq: new mongoose.Types.ObjectId(req.user._id),
+      $addFields: {
+        missingIds: {
+          $filter: {
+            input: Ids,
+            as: "id",
+            cond: { $not: { $in: ["$$id", "$friends"] } },
+          },
         },
       },
     },
-    {
-      $addFields: {
-        missingIds: { $setDifference: [[participantIds], "$friends"] },
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        missingIds: 1,
-      },
-    },
+    { $project: { _id: 1, missingIds: 1 } },
   ]);
 
-  const missingIds = isAllParticipantsExistInFriendArray[0].missingIds;
-  if (missingIds[0].length > 0) {
+  const missingIds = isAllParticipantsExistInFriendArray[0]?.missingIds || [];
+  if (missingIds.length > 0) {
     return res
       .status(400)
       .json(
         new ApiResponse(
           400,
-          { missingIds: missingIds[0] },
-          "Participant ids not found in friends list"
+          { missingIds },
+          "Participant IDs not found in friends list"
         )
       );
   }
 
-  const participantsArray = participantIds.map(
-    (id) => new mongoose.Types.ObjectId(id)
-  );
-  participantsArray.push(req.user._id);
+  const participantsArray = [...Ids, new mongoose.Types.ObjectId(req.user._id)];
 
   const isChatExist = await Chat.aggregate([
     {
       $match: {
-        participants: {
-          $all: participantsArray,
-        },
+        isGroup: true,
+        participants: { $all: participantsArray },
       },
     },
   ]);
 
   if (isChatExist.length > 0) {
-    throw createError.badRequest("Chat already exist");
-  }
-
-  let coverImagePath;
-  let coverImagePublicId;
-  if (req.files && req.files.coverImage && req.files.coverImage.length > 0) {
-    coverImagePath = req.files.coverImage[0].path;
-    coverImagePublicId = req.files.coverImage[0].originalname;
+    throw createError.badRequest("Chat already exists");
   }
 
   let coverImageData;
-  if (coverImagePath && coverImagePublicId) {
-    const { secure_url: url, public_id: publicId } = uploadFilesToCloudinary(
-      [coverImagePath],
-      req.user.username,
-      [coverImagePublicId]
-    );
-
-    coverImageData = { url, fileName: coverImagePublicId, publicId };
+  try {
+    if (
+      req.files &&
+      req.files.coverImage &&
+      Array.isArray(req.files.coverImage) &&
+      req.files.coverImage.length > 0
+    ) {
+      const coverImagePath = req.files.coverImage[0].path;
+      const coverImagePublicId = req.files.coverImage[0].originalname;
+      const response = await uploadFilesToCloudinary(
+        [coverImagePath],
+        req.user.username,
+        [coverImagePublicId]
+      );
+      console.log("response :>> ", response);
+      const { secure_url: url, public_id: publicId } = response[0];
+      coverImageData = { url, fileName: coverImagePublicId, publicId };
+    } else {
+      return res
+        .status(400)
+        .json(new ApiResponse(400, null, "Cover image is required"));
+    }
+  } catch (error) {
+    throw createError.internalServerError("Failed to upload cover image");
   }
+
+  const unreadMessageCountMap = new Map([]);
+
+  participantsArray.forEach((id) => {
+    unreadMessageCountMap.set(id, 0);
+  });
 
   const chat = await Chat.create({
     participants: participantsArray,
-    chatName: chatName,
+    chatName,
     isGroup: true,
     admin: req.user._id,
     coverImage: coverImageData,
+    unreadMessagesCounts: unreadMessageCountMap,
   });
 
-  console.log("chat :>> ", chat);
+  const populatedChat = await Chat.findById(chat._id).populate(
+    "participants",
+    "username email profilePicture _id"
+  );
 
   if (!chat) {
     throw createError.internalServerError("Chat creation failed");
@@ -146,7 +162,7 @@ const createGroupChat = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(201, chat, "Chat created successfully"));
+    .json(new ApiResponse(201, populatedChat, "Chat created successfully"));
 });
 
 const addParticipantInGroupChat = asyncHandler(async (req, res) => {
