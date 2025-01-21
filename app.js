@@ -28,6 +28,16 @@ const io = new Server(httpServer, {
 app.set("io", io);
 
 console.log("process.env.CORS_ORIGIN :>> ", process.env.CORS_ORIGIN);
+
+app.options(
+  "*",
+  cors({
+    credentials: true,
+    origin: process.env.CORS_ORIGIN,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  })
+);
+
 // Middleware
 app.use(
   cors({
