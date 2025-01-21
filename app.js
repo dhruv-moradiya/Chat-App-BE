@@ -19,7 +19,7 @@ const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CORS_ORIGIN,
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true,
   },
 });
@@ -33,6 +33,7 @@ app.use(
   cors({
     credentials: true,
     origin: process.env.CORS_ORIGIN, // No need to template here
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   })
 );
 app.use(express.json({ limit: "50mb" }));
