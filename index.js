@@ -3,12 +3,14 @@ import dotenv from "dotenv";
 const environment = process.env.NODE_ENV || "development";
 
 dotenv.config({
-  path: environment === "production" ? ".env.production" : ".env",
+  path: environment === "production" ? ".env.production" : ".env.development",
 });
 
 import { connectDB } from "./db/index.js";
 import { httpServer } from "./app.js";
 import { logger } from "./utils/logger.js";
+
+console.log("object :>> ", process.env.CORS_ORIGIN);
 
 connectDB()
   .then(() => {

@@ -9,13 +9,11 @@ import dotenv from "dotenv";
 const environment = process.env.NODE_ENV || "development";
 
 dotenv.config({
-  path: environment === "production" ? ".env.production" : ".env",
+  path: environment === "production" ? ".env.production" : ".env.development",
 });
 
 const app = express();
 const httpServer = http.createServer(app);
-
-console.log("process.env.CORS_ORIGIN :>> ", process.env.CORS_ORIGIN);
 
 // Configure Socket.IO
 const io = new Server(httpServer, {
@@ -29,6 +27,7 @@ const io = new Server(httpServer, {
 // Attach Socket.IO to the app
 app.set("io", io);
 
+console.log("process.env.CORS_ORIGIN :>> ", process.env.CORS_ORIGIN);
 // Middleware
 app.use(
   cors({
