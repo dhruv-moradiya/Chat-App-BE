@@ -107,7 +107,7 @@ const createMessageValidator = () => {
       .withMessage("Chat id is required")
       .isMongoId()
       .withMessage("Chat id is invalid"),
-    body("content").trim().notEmpty().withMessage("Content is required"),
+    body("content").trim().optional(),
     body("replyTo")
       .optional()
       .isMongoId()

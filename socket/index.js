@@ -62,6 +62,12 @@ const listenForCurrentActiveChat = (io, socket) => {
   );
 };
 
+const emitEventForUpdatedMessageWithAttachment = (io, chatId, message) => {
+  io.to(chatId).emit(ChatEventEnum.UPDATED_MESSAGE_WITH_ATTACHMENT_EVENT, {
+    message,
+  });
+};
+
 const emitEventForNewMessageReceived = async (io, chatId, message) => {
   // Get all members currently in the room
   const roomMembers =
@@ -240,4 +246,8 @@ const initializeSocket = (io) => {
   });
 };
 
-export { initializeSocket, emitEventForNewMessageReceived };
+export {
+  initializeSocket,
+  emitEventForNewMessageReceived,
+  emitEventForUpdatedMessageWithAttachment,
+};

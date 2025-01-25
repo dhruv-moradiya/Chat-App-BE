@@ -1,10 +1,10 @@
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser";
 import http from "http";
+import cors from "cors";
+import express from "express";
+import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
 import { Server } from "socket.io";
 import { initializeSocket } from "./socket/index.js";
-import dotenv from "dotenv";
 
 const environment = process.env.NODE_ENV || "development";
 
@@ -19,7 +19,7 @@ const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CORS_ORIGIN,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST"],
     credentials: true,
   },
 });
@@ -42,7 +42,7 @@ app.options(
 app.use(
   cors({
     credentials: true,
-    origin: process.env.CORS_ORIGIN, // No need to template here
+    origin: process.env.CORS_ORIGIN,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   })
 );

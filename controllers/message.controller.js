@@ -4,45 +4,88 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 import { createError } from "../utils/ApiError.js";
-import { emitEventForNewMessageReceived } from "../socket/index.js";
+import {
+  emitEventForNewMessageReceived,
+  emitEventForUpdatedMessageWithAttachment,
+} from "../socket/index.js";
+
+const uploadAttachmentOnCloudinary = (
+  req,
+  chatId,
+  message,
+  attachmentsLocalPath,
+  publicIds
+) => {
+  let attachmentsData = [];
+  uploadFilesToCloudinary(attachmentsLocalPath, req.user.username, publicIds)
+    .then(async (uploadedFiles) => {
+      attachmentsData = uploadedFiles.map((file) => ({
+        url: file.secure_url,
+        fileName: file.original_filename,
+        publicId: file.public_id,
+      }));
+
+      const updatedMessage = await Message.findOneAndUpdate(
+        { _id: message._id },
+        { $set: { attachments: attachmentsData } },
+        { new: true }
+      );
+
+      const messageResponseForSocket = {
+        ...updatedMessage.toObject(),
+        sender: req.user,
+      };
+
+      emitEventForUpdatedMessageWithAttachment(
+        req.app.get("io"),
+        chatId,
+        messageResponseForSocket
+      );
+    })
+    .catch((err) => {
+      console.error("Error uploading files to Cloudinary:", err);
+      attachmentsData = [];
+    });
+};
 
 const createMessage = asyncHandler(async (req, res) => {
   const { chatId, content, replyTo } = req.body;
+
   const senderId = req.user._id;
 
   const attachments = req.files?.attachments;
-  console.log("attachments :>> ", attachments);
 
-  let attachmentsData = [];
-
-  if (attachments?.length) {
-    const attachmentsLocalPath = attachments.map((file) => file.path);
-    const publicIds = attachments.map((file) => file.originalname);
-
-    const uploadedFiles = await uploadFilesToCloudinary(
-      attachmentsLocalPath,
-      req.user.username,
-      publicIds
-    );
-
-    attachmentsData = uploadedFiles?.map((file) => ({
-      url: file.secure_url,
-      fileName: file.original_filename,
-      publicId: file.public_id,
-    }));
+  if (!content && !attachments) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, {}, "Please provide content or attachments"));
   }
 
-  const newMessageData = {
+  let newMessageData = {};
+
+  newMessageData = {
     sender: senderId,
     chat: chatId,
-    content,
-    ...(attachmentsData.length && { attachments: attachmentsData }),
+    content: content ? content : "",
     ...(replyTo && { replyTo }),
   };
 
   const message = await Message.create(newMessageData);
   const messageObject = message.toObject();
   delete messageObject.__v;
+
+  if (attachments && Array.isArray(attachments) && attachments.length) {
+    const attachmentsLocalPath = attachments.map((file) => file.path);
+    const publicIds = attachments.map((file) => file.originalname);
+
+    uploadAttachmentOnCloudinary(
+      req,
+      chatId,
+      message,
+      attachmentsLocalPath,
+      publicIds
+    );
+  }
 
   if (!message) {
     throw createError.internalServerError("Failed to create message");
@@ -54,6 +97,10 @@ const createMessage = asyncHandler(async (req, res) => {
 
   const messageResponseForSocket = {
     ...message.toObject(),
+    sender: req.user,
+    ...(attachments &&
+      Array.isArray(attachments) &&
+      attachments.length && { isAttachment: true }),
   };
 
   emitEventForNewMessageReceived(
@@ -112,15 +159,44 @@ const getMessagesBasedOnChatId = asyncHandler(async (req, res, next) => {
       {
         $facet: {
           messages: [
-            { $skip: skip },
-            { $limit: limit },
+            {
+              $skip: skip,
+            },
+            {
+              $limit: limit,
+            },
+            {
+              $lookup: {
+                from: "users",
+                localField: "sender",
+                foreignField: "_id",
+                as: "sender",
+              },
+            },
+            {
+              $unwind: {
+                path: "$sender",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
             {
               $project: {
                 __v: 0,
+                "sender.password": 0,
+                "sender.refreshToken": 0,
+                "sender.__v": 0,
+                "sender.mutedChats": 0,
+                "sender.friends": 0,
+                "sender.updatedAt": 0,
+                "sender.createdAt": 0,
               },
             },
           ],
-          totalCount: [{ $count: "totalMessages" }],
+          totalCount: [
+            {
+              $count: "totalMessages",
+            },
+          ],
         },
       },
       {
@@ -171,7 +247,6 @@ const getMessagesBasedOnChatId = asyncHandler(async (req, res, next) => {
       .status(200)
       .json(new ApiResponse(200, data, "Messages fetched successfully"));
   } catch (error) {
-    // Handle potential errors, such as invalid ObjectId
     return next(
       createError.internalServerError(
         500,
