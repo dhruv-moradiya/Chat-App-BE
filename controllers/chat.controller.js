@@ -124,7 +124,6 @@ const createGroupChat = asyncHandler(async (req, res) => {
         req.user.username,
         [coverImagePublicId]
       );
-      console.log("response :>> ", response);
       const { secure_url: url, public_id: publicId } = response[0];
       coverImageData = { url, fileName: coverImagePublicId, publicId };
     } else {

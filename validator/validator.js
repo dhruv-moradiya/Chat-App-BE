@@ -146,6 +146,46 @@ const addOrRemoveParticipantValidator = () => {
   ];
 };
 
+const deleteMessageForSelectedParticipantsValidator = () => {
+  return [
+    body("messageId")
+      .isArray()
+      .withMessage("Message ids must be an array of valid MongoDB IDs")
+      .isLength(1)
+      .withMessage("Message ids must be an array of 1 valid MongoDB IDs"),
+    body("messageId.*")
+      .isMongoId()
+      .withMessage("Message ids must be an array of valid MongoDB IDs"),
+    body("isDeletedForAll")
+      .notEmpty()
+      .withMessage("isDeletedForAll is required")
+      .isBoolean()
+      .withMessage("isDeletedForAll must be a boolean"),
+  ];
+};
+
+const deleteMessageValidator = () => {
+  return [
+    body("messageId")
+      .trim()
+      .notEmpty()
+      .withMessage("Message id is required")
+      .isMongoId()
+      .withMessage("Message id is invalid"),
+  ];
+};
+
+const clearChatMessagesValidator = () => {
+  return [
+    body("chatId")
+      .trim()
+      .notEmpty()
+      .withMessage("Chat id is required")
+      .isMongoId()
+      .withMessage("Chat id is invalid"),
+  ];
+};
+
 export {
   validate,
   userRegisterValidator,
@@ -157,4 +197,7 @@ export {
   createMessageValidator,
   createGroupChatValidator,
   addOrRemoveParticipantValidator,
+  deleteMessageForSelectedParticipantsValidator,
+  deleteMessageValidator,
+  clearChatMessagesValidator,
 };

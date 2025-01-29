@@ -5,9 +5,11 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 import { createError } from "../utils/ApiError.js";
 import {
+  emitEventForMessageDeleteEitherForEveryoneOrSelf,
   emitEventForNewMessageReceived,
   emitEventForUpdatedMessageWithAttachment,
 } from "../socket/index.js";
+import Chat from "../models/chat.model.js";
 
 const uploadAttachmentOnCloudinary = (
   req,
@@ -256,4 +258,101 @@ const getMessagesBasedOnChatId = asyncHandler(async (req, res, next) => {
   }
 });
 
-export { createMessage, getMyMessages, getMessagesBasedOnChatId };
+const deleteMessageForSelectedParticipants = asyncHandler(
+  async (req, res, next) => {
+    const { messageId, isDeletedForAll } = req.body;
+
+    if (!Array.isArray(messageId) || messageId.length === 0) {
+      return next(
+        createError.badRequest("messageId must be a non-empty array")
+      );
+    }
+
+    const message = await Message.findById(messageId[0]);
+    if (!message) {
+      return next(createError.notFound("Message not found"));
+    }
+
+    if (req.user._id !== message.sender && isDeletedForAll) {
+      return next(
+        createError.forbidden(
+          "You are not allowed to delete this message for everyone"
+        )
+      );
+    }
+
+    const deleteMessages = await Message.updateMany(
+      { _id: { $in: messageId.map((id) => new mongoose.Types.ObjectId(id)) } },
+      {
+        $set: { isDeletedForAll },
+        $addToSet: { deletedBy: req.user._id },
+      },
+      { new: true }
+    );
+
+    if (!deleteMessages.modifiedCount) {
+      return next(createError.internalServerError("Failed to delete message"));
+    }
+
+    emitEventForMessageDeleteEitherForEveryoneOrSelf(
+      req.app.get("io"),
+      message.chat,
+      req.user._id,
+      isDeletedForAll,
+      message._id
+    );
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Message deleted successfully"));
+  }
+);
+
+const deleteMessage = asyncHandler(async (req, res, next) => {
+  const { messageId } = req.body;
+
+  const message = await Message.findById(messageId);
+
+  if (!message) {
+    return next(createError.notFound("Message not found"));
+  }
+
+  const deleteMessage = await Message.findByIdAndDelete(messageId);
+
+  if (!deleteMessage) {
+    return next(createError.internalServerError("Failed to delete message"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Message deleted successfully"));
+});
+
+const clearChatMessages = asyncHandler(async (req, res, next) => {
+  const { chatId } = req.body;
+
+  const chat = await Chat.findById(chatId);
+
+  if (!chat) {
+    return next(createError.notFound("Chat not found"));
+  }
+
+  const deleteMessages = await Message.deleteMany({ chat: chatId });
+
+  if (!deleteMessages) {
+    return next(createError.internalServerError("Failed to delete messages"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Messages cleared successfully"));
+});
+
+export {
+  createMessage,
+  getMyMessages,
+  getMessagesBasedOnChatId,
+  deleteMessageForSelectedParticipants,
+  deleteMessage,
+  clearChatMessages,
+};

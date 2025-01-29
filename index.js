@@ -10,8 +10,6 @@ import { connectDB } from "./db/index.js";
 import { httpServer } from "./app.js";
 import { logger } from "./utils/logger.js";
 
-console.log("object :>> ", process.env.CORS_ORIGIN);
-
 connectDB()
   .then(() => {
     const PORT = process.env.PORT || 3000;

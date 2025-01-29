@@ -27,8 +27,6 @@ const io = new Server(httpServer, {
 // Attach Socket.IO to the app
 app.set("io", io);
 
-console.log("process.env.CORS_ORIGIN :>> ", process.env.CORS_ORIGIN);
-
 app.options(
   "*",
   cors({

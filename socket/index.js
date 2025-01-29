@@ -175,12 +175,40 @@ const emitUnreadMessageCount = async (io, userId) => {
     },
   ]);
 
-  console.log("unreadMessagesQuery :>> ", unreadMessagesQuery);
-
   io.to(userId).emit(
     ChatEventEnum.UNREAD_MESSAGE_COUNT_EVENT,
     unreadMessagesQuery
   );
+};
+
+const emitEventForMessageDeleteEitherForEveryoneOrSelf = (
+  io,
+  chatId,
+  userId,
+  isDeletedForAll,
+  messageId
+) => {
+  if (isDeletedForAll) {
+    io.to(chatId).emit(
+      ChatEventEnum.DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT,
+      {
+        chatId,
+        messageId,
+        deletedBy: userId,
+        isDeletedForAll,
+      }
+    );
+  } else {
+    io.to(userId).emit(
+      ChatEventEnum.DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT,
+      {
+        chatId,
+        messageId,
+        deletedBy: userId,
+        isDeletedForAll,
+      }
+    );
+  }
 };
 
 const initializeSocket = (io) => {
@@ -250,4 +278,5 @@ export {
   initializeSocket,
   emitEventForNewMessageReceived,
   emitEventForUpdatedMessageWithAttachment,
+  emitEventForMessageDeleteEitherForEveryoneOrSelf,
 };
