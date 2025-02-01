@@ -186,14 +186,14 @@ const emitEventForMessageDeleteEitherForEveryoneOrSelf = (
   chatId,
   userId,
   isDeletedForAll,
-  messageId
+  messageIds
 ) => {
   if (isDeletedForAll) {
-    io.to(chatId).emit(
+    io.to(chatId.toString()).emit(
       ChatEventEnum.DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT,
       {
         chatId,
-        messageId,
+        messageIds,
         deletedBy: userId,
         isDeletedForAll,
       }
@@ -203,7 +203,7 @@ const emitEventForMessageDeleteEitherForEveryoneOrSelf = (
       ChatEventEnum.DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT,
       {
         chatId,
-        messageId,
+        messageIds,
         deletedBy: userId,
         isDeletedForAll,
       }

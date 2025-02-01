@@ -148,12 +148,12 @@ const addOrRemoveParticipantValidator = () => {
 
 const deleteMessageForSelectedParticipantsValidator = () => {
   return [
-    body("messageId")
+    body("messageIds")
       .isArray()
       .withMessage("Message ids must be an array of valid MongoDB IDs")
       .isLength(1)
       .withMessage("Message ids must be an array of 1 valid MongoDB IDs"),
-    body("messageId.*")
+    body("messageIds.*")
       .isMongoId()
       .withMessage("Message ids must be an array of valid MongoDB IDs"),
     body("isDeletedForAll")

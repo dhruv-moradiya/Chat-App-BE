@@ -260,46 +260,57 @@ const getMessagesBasedOnChatId = asyncHandler(async (req, res, next) => {
 
 const deleteMessageForSelectedParticipants = asyncHandler(
   async (req, res, next) => {
-    const { messageId, isDeletedForAll } = req.body;
+    const { messageIds, isDeletedForAll } = req.body;
+    const userId = new mongoose.Types.ObjectId(req.user._id);
 
-    if (!Array.isArray(messageId) || messageId.length === 0) {
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
       return next(
         createError.badRequest("messageId must be a non-empty array")
       );
     }
 
-    const message = await Message.findById(messageId[0]);
-    if (!message) {
-      return next(createError.notFound("Message not found"));
+    if (!messageIds.every((id) => mongoose.Types.ObjectId.isValid(id))) {
+      return next(createError.badRequest("Invalid message id"));
     }
 
-    if (req.user._id !== message.sender && isDeletedForAll) {
-      return next(
-        createError.forbidden(
-          "You are not allowed to delete this message for everyone"
-        )
-      );
+    // Fetch messages
+    const messages = await Message.find({ _id: { $in: messageIds } });
+    if (!messages.length) {
+      return next(createError.notFound("Messages not found"));
     }
 
+    if (isDeletedForAll) {
+      for (const message of messages) {
+        if (!userId.equals(message.sender)) {
+          return next(
+            createError.forbidden(
+              "You are not allowed to delete this message for everyone"
+            )
+          );
+        }
+      }
+    }
+
+    // Update messages
     const deleteMessages = await Message.updateMany(
-      { _id: { $in: messageId.map((id) => new mongoose.Types.ObjectId(id)) } },
+      { _id: { $in: messageIds } },
       {
         $set: { isDeletedForAll },
         $addToSet: { deletedBy: req.user._id },
-      },
-      { new: true }
+      }
     );
 
     if (!deleteMessages.modifiedCount) {
       return next(createError.internalServerError("Failed to delete message"));
     }
 
+    // Emit delete event
     emitEventForMessageDeleteEitherForEveryoneOrSelf(
       req.app.get("io"),
-      message.chat,
+      messages[0].chat,
       req.user._id,
       isDeletedForAll,
-      message._id
+      messages.map((message) => message._id)
     );
 
     return res
