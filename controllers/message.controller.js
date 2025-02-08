@@ -52,9 +52,7 @@ const uploadAttachmentOnCloudinary = (
 
 const createMessage = asyncHandler(async (req, res) => {
   const { chatId, content, replyTo } = req.body;
-
   const senderId = req.user._id;
-
   const attachments = req.files?.attachments;
 
   if (!content && !attachments) {
@@ -63,59 +61,65 @@ const createMessage = asyncHandler(async (req, res) => {
       .json(new ApiResponse(400, {}, "Please provide content or attachments"));
   }
 
-  let newMessageData = {};
+  const tempId = new mongoose.Types.ObjectId();
+  const createdAt = new Date().toISOString();
 
-  newMessageData = {
-    sender: senderId,
+  const messageForSocket = {
+    _id: tempId,
+    sender: req.user,
     chat: chatId,
-    content: content ? content : "",
+    content: content || "",
+    createdAt,
+    updatedAt: createdAt,
+    isPending: true,
+    attachments: [],
+    deletedBy: [],
+    reactions: [],
+    ...(attachments && attachments.length > 0 && { isAttachment: true }),
     ...(replyTo && { replyTo }),
   };
 
-  const message = await Message.create(newMessageData);
-  const messageObject = message.toObject();
-  delete messageObject.__v;
+  emitEventForNewMessageReceived(req.app.get("io"), chatId, messageForSocket);
 
-  if (attachments && Array.isArray(attachments) && attachments.length) {
-    const attachmentsLocalPath = attachments.map((file) => file.path);
-    const publicIds = attachments.map((file) => file.originalname);
+  (async () => {
+    try {
+      const newMessageData = {
+        _id: tempId,
+        sender: senderId,
+        chat: chatId,
+        content: content || "",
+        createdAt,
+        ...(replyTo && { replyTo }),
+      };
 
-    uploadAttachmentOnCloudinary(
-      req,
-      chatId,
-      message,
-      attachmentsLocalPath,
-      publicIds
-    );
-  }
+      const message = await Message.create(newMessageData);
 
-  if (!message) {
-    throw createError.internalServerError("Failed to create message");
-  }
+      emitEventForNewMessageReceived(req.app.get("io"), chatId, {
+        ...message.toObject(),
+        sender: req.user,
+        ...(attachments &&
+          Array.isArray(attachments) &&
+          attachments.length && { isAttachment: true }),
+        isPending: false,
+      });
 
-  const messageResponse = {
-    _id: message._id,
-  };
+      if (attachments && attachments.length) {
+        const attachmentsLocalPath = attachments.map((file) => file.path);
+        const publicIds = attachments.map((file) => file.originalname);
+        uploadAttachmentOnCloudinary(
+          req,
+          chatId,
+          message,
+          attachmentsLocalPath,
+          publicIds
+        );
+      }
+    } catch (error) {
+      console.error("Error saving message:", error);
+    }
+  })();
 
-  const messageResponseForSocket = {
-    ...message.toObject(),
-    sender: req.user,
-    ...(attachments &&
-      Array.isArray(attachments) &&
-      attachments.length && { isAttachment: true }),
-  };
-
-  emitEventForNewMessageReceived(
-    req.app.get("io"),
-    chatId,
-    messageResponseForSocket
-  );
-
-  res
-    .status(201)
-    .json(
-      new ApiResponse(201, messageResponse, "Message created successfully")
-    );
+  res.status(201).json(new ApiResponse(201, { _id: tempId }, "Message sent"));
 });
 
 const getMyMessages = asyncHandler(async (req, res) => {
