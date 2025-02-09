@@ -47,6 +47,11 @@ const uploadAttachmentOnCloudinary = (
     .catch((err) => {
       console.error("Error uploading files to Cloudinary:", err);
       attachmentsData = [];
+
+      throw createError.internalServerError(
+        500,
+        "Failed to upload files to Cloudinary"
+      );
     });
 };
 
@@ -363,6 +368,43 @@ const clearChatMessages = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(200, {}, "Messages cleared successfully"));
 });
 
+const saveAttachmentInDatabase = asyncHandler(async (req, res) => {
+  const { chatId, messageId } = req.body;
+  const attachments = req.files?.attachments;
+
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, {}, "Please provide attachments"));
+  }
+
+  const message = await Message.findById(messageId);
+  if (!message) {
+    return res.status(404).json(new ApiResponse(404, {}, "Message not found"));
+  }
+
+  const attachmentsLocalPath = attachments.map((file) => file.path);
+  const publicIds = attachments.map((file) => file.originalname);
+  try {
+    await uploadAttachmentOnCloudinary(
+      req,
+      chatId,
+      message,
+      attachmentsLocalPath,
+      publicIds
+    );
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Attachments uploaded successfully"));
+  } catch (error) {
+    console.error("Error saving attachment in database:", error);
+    return res
+      .status(500)
+      .json(new ApiResponse(500, {}, "Internal Server Error"));
+  }
+});
+
 export {
   createMessage,
   getMyMessages,
@@ -370,4 +412,5 @@ export {
   deleteMessageForSelectedParticipants,
   deleteMessage,
   clearChatMessages,
+  saveAttachmentInDatabase,
 };

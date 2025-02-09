@@ -29,12 +29,13 @@ const ChatEventEnum = Object.freeze({
 
   // Messaging
   UPDATED_MESSAGE_WITH_ATTACHMENT_EVENT: "updatedMessageWithAttachment",
+  DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT: "deleteMessageForEveryoneOrSelf",
   MESSAGE_RECEIVED_EVENT: "messageReceived",
+  MESSAGE_SEND_EVENT: "messageSent",
   MESSAGE_DELETE_EVENT: "messageDeleted",
   MESSAGE_EDIT_EVENT: "messageEdited",
   TYPING_EVENT: "typing",
   STOP_TYPING_EVENT: "stopTyping",
-  DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT: "deleteMessageForEveryoneOrSelf",
 
   // Reactions and interactions
   MESSAGE_LIKE_EVENT: "messageLiked",

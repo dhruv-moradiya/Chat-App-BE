@@ -7,6 +7,7 @@ import { logger } from "../utils/logger.js";
 import Chat from "../models/chat.model.js";
 import mongoose from "mongoose";
 import { areArraysEqual } from "../utils/helpers.js";
+import Message from "../models/message.model.js";
 
 const emitError = (socket, error) => {
   socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, error);
@@ -65,6 +66,56 @@ const listenForCurrentActiveChat = (io, socket) => {
 const emitEventForUpdatedMessageWithAttachment = (io, chatId, message) => {
   io.to(chatId).emit(ChatEventEnum.UPDATED_MESSAGE_WITH_ATTACHMENT_EVENT, {
     message,
+  });
+};
+
+const listeningForMessageSendEvent = (io, socket) => {
+  socket.on(ChatEventEnum.MESSAGE_SEND_EVENT, async ({ messageData }) => {
+    const { chatId, content, replyTo, isAttachment } = messageData;
+    const senderId = socket.user._id;
+
+    const tempId = new mongoose.Types.ObjectId();
+    const createdAt = new Date().toISOString();
+
+    const message = {
+      _id: tempId,
+      sender: socket.user,
+      chat: chatId,
+      content: content || "",
+      createdAt,
+      updatedAt: createdAt,
+      isPending: true,
+      attachments: [],
+      deletedBy: [],
+      reactions: [],
+      ...(isAttachment && { isAttachment }),
+      ...(replyTo && { replyTo }),
+    };
+
+    // Emit message received event to all users in the room
+    emitEventForNewMessageReceived(io, chatId, message);
+
+    try {
+      const newMessageData = {
+        _id: tempId,
+        sender: senderId,
+        chat: chatId,
+        content: content || "",
+        createdAt,
+        ...(replyTo && { replyTo }),
+      };
+
+      const message = await Message.create(newMessageData);
+
+      emitEventForNewMessageReceived(io, chatId, {
+        ...message.toObject(),
+        sender: socket.user,
+        ...(isAttachment && { isAttachment }),
+        isPending: false,
+      });
+    } catch (error) {
+      emitError(socket, "Error while sending the message.");
+    }
   });
 };
 
@@ -251,6 +302,7 @@ const initializeSocket = (io) => {
       mountParticipantStopTypingEvent(socket);
       listenForLeaveChatEvent(io, socket);
       listenForCurrentActiveChat(io, socket);
+      listeningForMessageSendEvent(io, socket);
       // emitUnreadMessageCount(io, user._id.toString());
 
       socket.on(ChatEventEnum.DISCONNECT_EVENT, () => {

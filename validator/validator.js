@@ -115,6 +115,23 @@ const createMessageValidator = () => {
   ];
 };
 
+const saveAttachmentValidator = () => {
+  return [
+    body("chatId")
+      .trim()
+      .notEmpty()
+      .withMessage("Chat id is required")
+      .isMongoId()
+      .withMessage("Chat id is invalid"),
+    body("messageId")
+      .trim()
+      .notEmpty()
+      .withMessage("Message id is required")
+      .isMongoId()
+      .withMessage("Message id is invalid"),
+  ];
+};
+
 const createGroupChatValidator = () => {
   return [
     body("chatName").trim().notEmpty().withMessage("Chat name is required"),
@@ -195,6 +212,7 @@ export {
   acceptOrRejectFriendRequestValidator,
   getUsersExcludingFriendsBasedOnSearchValidator,
   createMessageValidator,
+  saveAttachmentValidator,
   createGroupChatValidator,
   addOrRemoveParticipantValidator,
   deleteMessageForSelectedParticipantsValidator,
