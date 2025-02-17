@@ -119,6 +119,27 @@ const listeningForMessageSendEvent = (io, socket) => {
   });
 };
 
+const listeningForMessageReactionEvent = async (io, socket) => {
+  socket.on(
+    ChatEventEnum.MESSAGE_REACT_EVENT,
+    ({ chatId, messageId, emoji }) => {
+      socket.broadcast.to(chatId).emit(ChatEventEnum.MESSAGE_REACT_EVENT, {
+        chatId,
+        messageId,
+        emoji,
+      });
+
+      Message.findOneAndUpdate(
+        { _id: messageId },
+        { $push: { reactions: { emoji } } },
+        { new: true, upsert: false }
+      ).then((message) => {
+        logger.info(`Message with ID ${messageId} updated successfully.`);
+      });
+    }
+  );
+};
+
 const emitEventForNewMessageReceived = async (io, chatId, message) => {
   // Get all members currently in the room
   const roomMembers =
@@ -303,6 +324,7 @@ const initializeSocket = (io) => {
       listenForLeaveChatEvent(io, socket);
       listenForCurrentActiveChat(io, socket);
       listeningForMessageSendEvent(io, socket);
+      listeningForMessageReactionEvent(io, socket);
       // emitUnreadMessageCount(io, user._id.toString());
 
       socket.on(ChatEventEnum.DISCONNECT_EVENT, () => {

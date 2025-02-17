@@ -39,7 +39,8 @@ const ChatEventEnum = Object.freeze({
 
   // Reactions and interactions
   MESSAGE_LIKE_EVENT: "messageLiked",
-  MESSAGE_REACT_EVENT: "messageReacted",
+  MESSAGE_REACT_EVENT: "messageReact",
+  MESSAGE_REACTED_EVENT: "messageReacted",
   MESSAGE_REPLY_EVENT: "messageReplied",
   MESSAGE_MENTION_EVENT: "messageMentioned",
 
