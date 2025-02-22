@@ -6,6 +6,7 @@ import {
   deleteMessage,
   deleteMessageForSelectedParticipants,
   getMessagesBasedOnChatId,
+  removeAllReactionsFromMessages,
   saveAttachmentInDatabase,
 } from "../controllers/message.controller.js";
 import {
@@ -73,5 +74,7 @@ router.delete(
   validate,
   clearChatMessages
 );
+
+router.patch("/remove-reactions", removeAllReactionsFromMessages);
 
 export default router;

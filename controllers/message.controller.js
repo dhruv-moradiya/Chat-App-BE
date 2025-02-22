@@ -405,6 +405,20 @@ const saveAttachmentInDatabase = asyncHandler(async (req, res) => {
   }
 });
 
+const removeAllReactionsFromMessages = asyncHandler(async (req, res, next) => {
+  const response = await Message.updateMany({
+    $set: { reactions: [] },
+  });
+
+  if (!response.modifiedCount) {
+    return next(createError.internalServerError("Failed to remove reactions"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Reactions removed successfully"));
+});
+
 export {
   createMessage,
   getMyMessages,
@@ -413,4 +427,5 @@ export {
   deleteMessage,
   clearChatMessages,
   saveAttachmentInDatabase,
+  removeAllReactionsFromMessages,
 };

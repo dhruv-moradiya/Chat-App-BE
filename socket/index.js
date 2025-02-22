@@ -93,7 +93,7 @@ const listeningForMessageSendEvent = (io, socket) => {
     };
 
     // Emit message received event to all users in the room
-    emitEventForNewMessageReceived(io, chatId, message);
+    // emitEventForNewMessageReceived(io, chatId, message);
 
     try {
       const newMessageData = {
@@ -119,23 +119,43 @@ const listeningForMessageSendEvent = (io, socket) => {
   });
 };
 
-const listeningForMessageReactionEvent = async (io, socket) => {
+const listeningForMessageReactionEvent = (io, socket) => {
   socket.on(
     ChatEventEnum.MESSAGE_REACT_EVENT,
-    ({ chatId, messageId, emoji }) => {
+    async ({ chatId, messageId, emoji, userId }) => {
       socket.broadcast.to(chatId).emit(ChatEventEnum.MESSAGE_REACT_EVENT, {
         chatId,
         messageId,
         emoji,
+        userId,
       });
+      try {
+        const updatedMessage = await Message.findOneAndUpdate(
+          { _id: messageId },
+          { $push: { reactions: { userId, emoji } } },
+          { new: true, upsert: false }
+        );
 
-      Message.findOneAndUpdate(
-        { _id: messageId },
-        { $push: { reactions: { emoji } } },
-        { new: true, upsert: false }
-      ).then((message) => {
-        logger.info(`Message with ID ${messageId} updated successfully.`);
-      });
+        if (!updatedMessage) {
+          return socket.emit(ChatEventEnum.ERROR_EVENT, {
+            message: "Message not found.",
+          });
+        }
+
+        socket.broadcast.to(chatId).emit(ChatEventEnum.MESSAGE_REACT_EVENT, {
+          chatId,
+          messageId,
+          emoji,
+          userId,
+        });
+
+        logger.info(
+          `✅ Reaction added to message ${messageId} by user ${userId}`
+        );
+      } catch (error) {
+        logger.error(`❌ Error updating message reaction: ${error.message}`);
+        // socket.emit(ChatEventEnum.ERROR_EVENT, { message: "Failed to react to message." });
+      }
     }
   );
 };

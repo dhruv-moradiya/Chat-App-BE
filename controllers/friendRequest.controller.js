@@ -356,6 +356,10 @@ const getMyFriendsList = asyncHandler(async (req, res) => {
     },
   ]);
 
+  if (!friends) {
+    return res.status(200).json(new ApiResponse(200, null, "No friends found"));
+  }
+
   return res
     .status(200)
     .json(
