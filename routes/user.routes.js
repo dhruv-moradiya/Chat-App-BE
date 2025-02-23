@@ -7,6 +7,7 @@ import {
   getUsersExcludingFriendsBasedOnSearch,
   loginUser,
   logoutUser,
+  refreshToken,
 } from "../controllers/user.controller.js";
 import {
   getUsersExcludingFriendsBasedOnSearchValidator,
@@ -17,6 +18,8 @@ import {
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+router.get("/refresh-token", refreshToken);
 
 router.post("/create-user", userRegisterValidator(), validate, createUser);
 

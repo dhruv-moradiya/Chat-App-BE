@@ -4,6 +4,7 @@ import User from "../models/user.model.js";
 import { createError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import jwt from "jsonwebtoken";
 
 // GENERATE TOKENS
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -73,7 +74,6 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!user) {
     throw createError.notFound("User not found");
   }
-
   const isPasswordValid = await user.comparePassword(password);
 
   if (!isPasswordValid) {
@@ -84,11 +84,25 @@ const loginUser = asyncHandler(async (req, res) => {
     user._id
   );
 
-  const cookieOptions = {
+  const accessTokenExpiryMs = eval(
+    process.env.ACCESS_TOKEN_EXPIRY.replace("m", " * 60 * 1000")
+  );
+  const refreshTokenExpiryMs = eval(
+    process.env.REFRESH_TOKEN_EXPIRY.replace("d", " * 24 * 60 * 60 * 1000")
+  );
+
+  const accessCookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: accessTokenExpiryMs,
+  };
+
+  const refreshCookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: refreshTokenExpiryMs,
   };
 
   const userResponse = {
@@ -101,8 +115,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .cookie("refreshToken", refreshToken, cookieOptions)
-    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, refreshCookieOptions)
+    .cookie("accessToken", accessToken, accessCookieOptions)
     .json(
       new ApiResponse(200, { user: userResponse }, "User login successful")
     );
@@ -130,6 +144,36 @@ const logoutUser = asyncHandler(async (req, res) => {
     .clearCookie("refreshToken")
     .clearCookie("accessToken")
     .json(new ApiResponse(200, {}, "User logged out successfully"));
+});
+
+// REFRESH TOKEN
+const refreshToken = asyncHandler(async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    throw createError.badRequest("No refresh token found");
+  }
+
+  const isTokenValid = await jwt.verify(
+    refreshToken,
+    process.env.REFRESH_TOKEN_SECRET
+  );
+
+  if (!isTokenValid) {
+    throw createError.unauthorized("Invalid refresh token provided");
+  }
+
+  const user = await User.findOne({ refreshToken });
+
+  if (!user) {
+    throw createError.unauthorized("Invalid refresh token");
+  }
+
+  const accessToken = user.generateAccessToken();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { accessToken }, "Access token refreshed"));
 });
 
 // GET CURRENT USER
@@ -237,6 +281,7 @@ export {
   createUser,
   loginUser,
   logoutUser,
+  refreshToken,
   getCurrentUser,
   getAllUsers,
   getUsersExcludingFriends,

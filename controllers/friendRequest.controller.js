@@ -65,7 +65,6 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     createdAt: friendRequest.createdAt,
   };
 
-  console.log(`Emitting FRIEND_REQUEST_RECEIVE_EVENT to room ${receiverId}`);
   req.app
     .get("io")
     .to(receiverId.toString())

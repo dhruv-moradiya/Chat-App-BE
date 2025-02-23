@@ -32,7 +32,6 @@ const uploadFilesToCloudinary = async (filePaths, userName, publicIds = []) => {
     });
 
     console.log("Files uploaded successfully to Cloudinary");
-    console.log("responses :>> ", responses);
     return responses;
   } catch (error) {
     console.error("Error while uploading files to Cloudinary:", error.message);
