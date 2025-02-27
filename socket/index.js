@@ -71,7 +71,8 @@ const emitEventForUpdatedMessageWithAttachment = (io, chatId, message) => {
 
 const listeningForMessageSendEvent = (io, socket) => {
   socket.on(ChatEventEnum.MESSAGE_SEND_EVENT, async ({ messageData }) => {
-    const { chatId, content, replyTo, isAttachment } = messageData;
+    const { chatId, content, replyTo, isAttachment, mentionedUsers } =
+      messageData;
     const senderId = socket.user._id;
 
     const tempId = new mongoose.Types.ObjectId();
@@ -88,6 +89,7 @@ const listeningForMessageSendEvent = (io, socket) => {
       attachments: [],
       deletedBy: [],
       reactions: [],
+      ...(mentionedUsers && { mentionedUsers }),
       ...(isAttachment && { isAttachment }),
       ...(replyTo && { replyTo }),
     };
@@ -102,10 +104,13 @@ const listeningForMessageSendEvent = (io, socket) => {
         chat: chatId,
         content: content || "",
         createdAt,
+        ...(mentionedUsers && { mentionedUsers }),
         ...(replyTo && { replyTo }),
       };
 
       const message = await Message.create(newMessageData);
+
+      console.log("message :>> ", message);
 
       emitEventForNewMessageReceived(io, chatId, {
         ...message.toObject(),

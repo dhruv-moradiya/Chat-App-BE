@@ -31,6 +31,7 @@ const MessageSchema = new mongoose.Schema(
     deletedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Users who have deleted the message for themselves
     isDeletedForAll: { type: Boolean }, // Indicates if the message is deleted for everyone
     chat: { type: mongoose.Schema.Types.ObjectId, ref: "Chat", required: true },
+    mentionedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );

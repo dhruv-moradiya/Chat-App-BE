@@ -225,6 +225,7 @@ const getMyChats = asyncHandler(async (req, res) => {
         "participants.mutedChats": 0,
         "participants.createdAt": 0,
         "participants.updatedAt": 0,
+        "participants.password": 0,
       },
     },
   ]);
