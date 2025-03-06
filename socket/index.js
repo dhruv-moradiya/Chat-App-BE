@@ -111,8 +111,6 @@ const listeningForMessageSendEvent = (io, socket) => {
 
       const message = await Message.create(newMessageData);
 
-      console.log("message :>> ", message);
-
       emitEventForNewMessageReceived(io, chatId, {
         ...message.toObject(),
         sender: socket.user,
@@ -125,50 +123,42 @@ const listeningForMessageSendEvent = (io, socket) => {
   });
 };
 
-const manageNotifications = async (io, socket, chatId, type, message) => {
-  const roomMembers = io.sockets.adapter.rooms.get(chatId) || new Set();
-
-  const userIdsInRoom = Array.from(roomMembers).map((socketId) => {
-    const socket = io.sockets.sockets.get(socketId);
-    return socket?.user?._id.toString();
-  });
-
-  const chat = await Chat.findById(chatId, { participants: 1 }).lean();
-  const chatParticipants =
-    chat?.participants
-      .map((p) => p._id.toString())
-      .filter((id) => id !== socket.user._id) || [];
+const manageNotifications = async (io, socketId, message) => {
+  const userId = io.sockets.sockets.get(socketId)?.user?._id.toString();
 
   const tempId = new mongoose.Types.ObjectId();
+  const type = message.mentionedUsers.length !== 0 ? "MENTIONED" : "";
 
   const notificationData = {
     _id: tempId,
-    sender: socket.user._id,
-    receivers: [...chatParticipants],
+    sender: message.sender._id,
+    receivers: userId,
     notificationType: type,
     message: message.content,
     isRead: false,
   };
 
-  switch (typw) {
+  switch (type) {
     case "MENTIONED":
       notificationData.type = "MENTION";
-      socket.broadcast.to(chatId).emit(ChatEventEnum.MENTION_EVENT, {
+
+      io.to(userId).emit(ChatEventEnum.NOTIFICATION_EVENT, {
         ...notificationData,
+        content: `${message.sender.username} mentioned you in a message.`,
       });
       break;
-    case "REPLY":
-      notificationData.type = "REPLY";
-      socket.broadcast.to(chatId).emit(ChatEventEnum.REPLY_EVENT, {
-        ...notificationData,
-      });
-      break;
+    // case "REPLY":
+    //   notificationData.type = "REPLY";
+    //   socket.broadcast.to(chatId).emit(ChatEventEnum.REPLY_EVENT, {
+    //     ...notificationData,
+    //   });
+    //   break;
 
     default:
       break;
   }
 
-  await Notification.create(notificationData);
+  // await Notification.create(notificationData);
 };
 
 const listeningForMessageReactionEvent = (io, socket) => {
@@ -361,6 +351,8 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
 
     // Prepare bulk update operations for unread message count
     const bulkUpdates = [];
+    console.log("onlineUserIds :>> ", onlineUserIds);
+    console.log("userThatAreNotInTheRoom", userThatAreNotInTheRoom);
 
     for (const userId of userThatAreNotInTheRoom) {
       if (onlineUserIds.has(userId)) {
@@ -369,7 +361,6 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
           const socket = io.sockets.sockets.get(socketId);
           return socket?.user?._id.toString() === userId;
         });
-
         if (userSocketId) {
           logger.debug(
             `Emitting unread message event for online user: ${userId}`
@@ -378,6 +369,8 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
             chatId,
             message,
           });
+          // TODO - Notification
+          manageNotifications(io, userSocketId, message);
         }
       }
 
