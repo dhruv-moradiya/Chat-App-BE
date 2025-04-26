@@ -116,11 +116,81 @@ const listeningForMessageSendEvent = (io, socket) => {
         ...message.toObject(),
         sender: socket.user,
         ...(isAttachment && { isAttachment }),
-        isPending: false,
+        // isPending: false,
       });
     } catch (error) {
       emitError(socket, "Error while sending the message.");
     }
+  });
+};
+
+const NotificationTypeEnum = {
+  MENTION: "MENTION",
+  REACTED: "REACTED",
+  REPLIED: "REPLIED",
+  ATTACHMENT: "ATTACHMENT",
+  APP_NOTIFICATION: "APP_NOTIFICATION",
+  NEW_MESSAGE: "NEW_MESSAGE",
+};
+
+const manageNotifications = async (io, socketId, message) => {
+  const socket = io.sockets.sockets.get(socketId);
+  if (!socket) return; // socket not found
+
+  const userId = socket.user?._id.toString();
+  const chatId = message.chat._id.toString();
+  const tempId = new mongoose.Types.ObjectId();
+
+  const isMentioned = message.mentionedUsers?.some(
+    (mentionedUser) => mentionedUser._id.toString() === userId
+  );
+
+  const isReacted = message.reactions?.some(
+    (reaction) => reaction.user.toString() === userId
+  );
+
+  const isReply = !!message.replyTo;
+  const hasAttachment = (message.attachments || []).length > 0;
+
+  let notificationType = null;
+  let notificationContent = "";
+
+  if (isMentioned && hasAttachment) {
+    notificationType = NotificationTypeEnum.MENTION;
+    notificationContent = `${message.sender.username} mentioned you with an attachment.`;
+  } else if (isMentioned) {
+    notificationType = NotificationTypeEnum.MENTION;
+    notificationContent = `${message.sender.username} mentioned you in a message.`;
+  } else if (isReacted) {
+    notificationType = NotificationTypeEnum.REACTED;
+    notificationContent = `${message.sender.username} reacted to your message.`;
+  } else if (isReply) {
+    notificationType = NotificationTypeEnum.REPLIED;
+    notificationContent = `${message.sender.username} replied to your message.`;
+  } else if (hasAttachment) {
+    notificationType = NotificationTypeEnum.ATTACHMENT;
+    notificationContent = `${message.sender.username} sent an attachment.`;
+  } else {
+    notificationType = NotificationTypeEnum.NEW_MESSAGE;
+    notificationContent = `${message.sender.username} sent a new message.`;
+  }
+
+  if (!notificationType) return;
+
+  const notificationData = {
+    _id: tempId,
+    sender: message.sender._id,
+    receivers: [userId],
+    notificationType,
+    message: message.content,
+    isRead: false,
+  };
+
+  io.to(userId).emit(ChatEventEnum.NOTIFICATION_EVENT, {
+    ...notificationData,
+    content: notificationContent,
+    chatId,
+    messageId: message._id,
   });
 };
 
@@ -201,6 +271,8 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
     const socket = io.sockets.sockets.get(socketId);
     return socket?.user?._id.toString(); // Extract user IDs of online users
   });
+  // Prepare bulk update operations for unread message count
+  const bulkUpdates = [];
 
   // Identify participants not currently in the room
   const userThatAreNotInTheRoom = chatParticipants.filter(
@@ -234,10 +306,17 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
           message,
         });
         // Update the database with the unread message count in the case if user is online and didn't join to the room
-        await Chat.updateOne(
-          { _id: chatId },
-          { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } }
-        );
+        bulkUpdates.push({
+          updateOne: {
+            filter: { _id: chatId },
+            update: { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } },
+          },
+        });
+        // Execute bulk update operation
+        if (bulkUpdates.length > 0) {
+          await Chat.bulkWrite(bulkUpdates);
+          bulkUpdates.length = 0; // Clear the array after executing the bulk operation
+        }
       }
     } else {
       // If the user is offline, update the database with the unread message count
@@ -248,34 +327,6 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
       );
     }
   });
-};
-
-// Function to emit the event for unread message count when user first time join to the socket
-const emitUnreadMessageCount = async (io, userId) => {
-  const unreadMessagesQuery = await Chat.aggregate([
-    {
-      $match: {
-        participants: {
-          $elemMatch: {
-            $eq: new mongoose.Types.ObjectId(userId),
-          },
-        },
-      },
-    },
-    {
-      $project: {
-        unreadMessagesCounts: {
-          $ifNull: ["$unreadMessagesCounts." + userId, 0],
-        },
-        _id: 1,
-      },
-    },
-  ]);
-
-  io.to(userId).emit(
-    ChatEventEnum.UNREAD_MESSAGE_COUNT_EVENT,
-    unreadMessagesQuery
-  );
 };
 
 const emitEventForMessageDeleteEitherForEveryoneOrSelf = (

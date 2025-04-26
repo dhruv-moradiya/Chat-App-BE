@@ -13,7 +13,13 @@ const NotificationSchema = new mongoose.Schema(
 
     notificationType: {
       type: String,
-      enum: ["MESSAGE", "MENTION", "ATTACHMENT", "APP_NOTIFICATION"],
+      enum: [
+        "NEW_MESSAGE",
+        "MENTION",
+        "ATTACHMENT",
+        "REPLIED",
+        "APP_NOTIFICATION",
+      ],
       required: true,
     },
 
