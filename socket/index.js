@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import { areArraysEqual } from "../utils/helpers.js";
 import Message from "../models/message.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { ManageNotifications } from "./notificationService.js";
 
 const emitError = (socket, error) => {
   socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, error);
@@ -123,76 +124,6 @@ const listeningForMessageSendEvent = (io, socket) => {
   });
 };
 
-const NotificationTypeEnum = {
-  MENTION: "MENTION",
-  REACTED: "REACTED",
-  REPLIED: "REPLIED",
-  ATTACHMENT: "ATTACHMENT",
-  APP_NOTIFICATION: "APP_NOTIFICATION",
-  NEW_MESSAGE: "NEW_MESSAGE",
-};
-
-const manageNotifications = async (io, socketId, message) => {
-  const socket = io.sockets.sockets.get(socketId);
-  if (!socket) return; // socket not found
-
-  const userId = socket.user?._id.toString();
-  const chatId = message.chat._id.toString();
-  const tempId = new mongoose.Types.ObjectId();
-
-  const isMentioned = message.mentionedUsers?.some(
-    (mentionedUser) => mentionedUser._id.toString() === userId
-  );
-
-  const isReacted = message.reactions?.some(
-    (reaction) => reaction.user.toString() === userId
-  );
-
-  const isReply = !!message.replyTo;
-  const hasAttachment = (message.attachments || []).length > 0;
-
-  let notificationType = null;
-  let notificationContent = "";
-
-  if (isMentioned && hasAttachment) {
-    notificationType = NotificationTypeEnum.MENTION;
-    notificationContent = `${message.sender.username} mentioned you with an attachment.`;
-  } else if (isMentioned) {
-    notificationType = NotificationTypeEnum.MENTION;
-    notificationContent = `${message.sender.username} mentioned you in a message.`;
-  } else if (isReacted) {
-    notificationType = NotificationTypeEnum.REACTED;
-    notificationContent = `${message.sender.username} reacted to your message.`;
-  } else if (isReply) {
-    notificationType = NotificationTypeEnum.REPLIED;
-    notificationContent = `${message.sender.username} replied to your message.`;
-  } else if (hasAttachment) {
-    notificationType = NotificationTypeEnum.ATTACHMENT;
-    notificationContent = `${message.sender.username} sent an attachment.`;
-  } else {
-    notificationType = NotificationTypeEnum.NEW_MESSAGE;
-    notificationContent = `${message.sender.username} sent a new message.`;
-  }
-
-  if (!notificationType) return;
-
-  const notificationData = {
-    _id: tempId,
-    sender: message.sender._id,
-    receivers: [userId],
-    notificationType,
-    message: message.content,
-    isRead: false,
-  };
-
-  io.to(userId).emit(ChatEventEnum.NOTIFICATION_EVENT, {
-    ...notificationData,
-    content: notificationContent,
-    chatId,
-    messageId: message._id,
-  });
-};
-
 const listeningForMessageReactionEvent = (io, socket) => {
   socket.on(
     ChatEventEnum.MESSAGE_REACT_EVENT,
@@ -233,92 +164,6 @@ const listeningForMessageReactionEvent = (io, socket) => {
     }
   );
 };
-
-// const emitEventForNewMessageReceived = async (io, chatId, message) => {
-//   // Get all members currently in the room
-//   // * io.sockets.adapter.rooms.get(chatId.toString()) This will only provide sockets IDs ||  io.sockets.sockets.get(socketId) This will provide that socket's info that we have add at time when user join in the room via their user ID
-//   const roomMembers =
-//     io.sockets.adapter.rooms.get(chatId.toString()) || new Set();
-//   const userIdsInRoom = Array.from(roomMembers).map((socketId) => {
-//     const socket = io.sockets.sockets.get(socketId);
-//     return socket?.user?._id.toString(); // Extract user ID from socket
-//   });
-
-//   // Fetch all participants of the chat from the database
-//   const chat = await Chat.findById(chatId, { participants: 1 }).lean();
-//   const chatParticipants =
-//     chat?.participants.map((p) => p._id.toString()) || []; // Extract participant IDs
-
-//   // Check if all participants are in the room
-//   const isAllParticipantsInRoom = chatParticipants.every((id) =>
-//     userIdsInRoom.includes(id)
-//   );
-
-//   if (isAllParticipantsInRoom) {
-//     logger.debug(
-//       `All participants are in the room. Emitting message received event.`
-//     );
-//     // Emit message received event to all users in the room if everyone is present
-//     io.to(chatId.toString()).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
-//       message,
-//     });
-//     return;
-//   }
-
-//   // Get all currently connected sockets and their user IDs
-//   const allConnectedSockets = Array.from(io.sockets.sockets.keys());
-//   const onlineUserIds = allConnectedSockets.map((socketId) => {
-//     const socket = io.sockets.sockets.get(socketId);
-//     return socket?.user?._id.toString(); // Extract user IDs of online users
-//   });
-
-//   // Identify participants not currently in the room
-//   const userThatAreNotInTheRoom = chatParticipants.filter(
-//     (id) => !userIdsInRoom.includes(id)
-//   );
-
-//   // Identify participants who are in the room
-//   const userThatAreInTheRoom = chatParticipants.filter((id) =>
-//     userIdsInRoom.includes(id)
-//   );
-
-//   // Emit message received event to users already in the room
-//   userThatAreInTheRoom.forEach((userId) => {
-//     io.to(userId).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
-//       message,
-//     });
-//   });
-
-//   // Handle users not in the room
-//   userThatAreNotInTheRoom.forEach(async (userId) => {
-//     if (onlineUserIds.includes(userId)) {
-//       // If the user is online but not in the room, emit an unread message event
-//       const userSocketId = allConnectedSockets.find((socketId) => {
-//         const socket = io.sockets.sockets.get(socketId);
-//         return socket?.user?._id.toString() === userId;
-//       });
-//       if (userSocketId) {
-//         logger.debug(`Emitting unread message event for user: ${userId}`);
-//         io.to(userSocketId).emit(ChatEventEnum.UNREAD_MESSAGE_EVENT, {
-//           chatId,
-//           message,
-//         });
-//         // Update the database with the unread message count in the case if user is online and didn't join to the room
-//         await Chat.updateOne(
-//           { _id: chatId },
-//           { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } }
-//         );
-//       }
-//     } else {
-//       // If the user is offline, update the database with the unread message count
-//       logger.debug(`Updating unread message count in DB for user: ${userId}`);
-//       await Chat.updateOne(
-//         { _id: chatId },
-//         { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } }
-//       );
-//     }
-//   });
-// };
 
 const emitEventForNewMessageReceived = async (io, chatId, message) => {
   try {
@@ -397,8 +242,20 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
             chatId,
             message,
           });
+
+          console.log("message :>> ", message);
+
           // Notification handling
-          manageNotifications(io, userSocketId, message);
+          const socket = io.sockets.sockets.get(userSocketId);
+          if (!socket) return; // socket not found
+
+          const userIdForNotification = socket.user?._id.toString();
+          const manageNotification = new ManageNotifications(
+            io,
+            userSocketId,
+            message
+          );
+          await manageNotification.sendNotification(userIdForNotification);
         }
       }
 
@@ -421,34 +278,6 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
   } catch (error) {
     logger.error(`Error in emitting new message event: ${error.message}`);
   }
-};
-
-// Function to emit the event for unread message count when user first time join to the socket
-const emitUnreadMessageCount = async (io, userId) => {
-  const unreadMessagesQuery = await Chat.aggregate([
-    {
-      $match: {
-        participants: {
-          $elemMatch: {
-            $eq: new mongoose.Types.ObjectId(userId),
-          },
-        },
-      },
-    },
-    {
-      $project: {
-        unreadMessagesCounts: {
-          $ifNull: ["$unreadMessagesCounts." + userId, 0],
-        },
-        _id: 1,
-      },
-    },
-  ]);
-
-  io.to(userId).emit(
-    ChatEventEnum.UNREAD_MESSAGE_COUNT_EVENT,
-    unreadMessagesQuery
-  );
 };
 
 const emitEventForMessageDeleteEitherForEveryoneOrSelf = (
