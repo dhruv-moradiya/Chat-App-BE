@@ -8,6 +8,7 @@ import Chat from "../models/chat.model.js";
 import mongoose from "mongoose";
 import { areArraysEqual } from "../utils/helpers.js";
 import Message from "../models/message.model.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const emitError = (socket, error) => {
   socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, error);
@@ -109,8 +110,6 @@ const listeningForMessageSendEvent = (io, socket) => {
       };
 
       const message = await Message.create(newMessageData);
-
-      console.log("message :>> ", message);
 
       emitEventForNewMessageReceived(io, chatId, {
         ...message.toObject(),
@@ -235,98 +234,221 @@ const listeningForMessageReactionEvent = (io, socket) => {
   );
 };
 
+// const emitEventForNewMessageReceived = async (io, chatId, message) => {
+//   // Get all members currently in the room
+//   // * io.sockets.adapter.rooms.get(chatId.toString()) This will only provide sockets IDs ||  io.sockets.sockets.get(socketId) This will provide that socket's info that we have add at time when user join in the room via their user ID
+//   const roomMembers =
+//     io.sockets.adapter.rooms.get(chatId.toString()) || new Set();
+//   const userIdsInRoom = Array.from(roomMembers).map((socketId) => {
+//     const socket = io.sockets.sockets.get(socketId);
+//     return socket?.user?._id.toString(); // Extract user ID from socket
+//   });
+
+//   // Fetch all participants of the chat from the database
+//   const chat = await Chat.findById(chatId, { participants: 1 }).lean();
+//   const chatParticipants =
+//     chat?.participants.map((p) => p._id.toString()) || []; // Extract participant IDs
+
+//   // Check if all participants are in the room
+//   const isAllParticipantsInRoom = chatParticipants.every((id) =>
+//     userIdsInRoom.includes(id)
+//   );
+
+//   if (isAllParticipantsInRoom) {
+//     logger.debug(
+//       `All participants are in the room. Emitting message received event.`
+//     );
+//     // Emit message received event to all users in the room if everyone is present
+//     io.to(chatId.toString()).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
+//       message,
+//     });
+//     return;
+//   }
+
+//   // Get all currently connected sockets and their user IDs
+//   const allConnectedSockets = Array.from(io.sockets.sockets.keys());
+//   const onlineUserIds = allConnectedSockets.map((socketId) => {
+//     const socket = io.sockets.sockets.get(socketId);
+//     return socket?.user?._id.toString(); // Extract user IDs of online users
+//   });
+
+//   // Identify participants not currently in the room
+//   const userThatAreNotInTheRoom = chatParticipants.filter(
+//     (id) => !userIdsInRoom.includes(id)
+//   );
+
+//   // Identify participants who are in the room
+//   const userThatAreInTheRoom = chatParticipants.filter((id) =>
+//     userIdsInRoom.includes(id)
+//   );
+
+//   // Emit message received event to users already in the room
+//   userThatAreInTheRoom.forEach((userId) => {
+//     io.to(userId).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
+//       message,
+//     });
+//   });
+
+//   // Handle users not in the room
+//   userThatAreNotInTheRoom.forEach(async (userId) => {
+//     if (onlineUserIds.includes(userId)) {
+//       // If the user is online but not in the room, emit an unread message event
+//       const userSocketId = allConnectedSockets.find((socketId) => {
+//         const socket = io.sockets.sockets.get(socketId);
+//         return socket?.user?._id.toString() === userId;
+//       });
+//       if (userSocketId) {
+//         logger.debug(`Emitting unread message event for user: ${userId}`);
+//         io.to(userSocketId).emit(ChatEventEnum.UNREAD_MESSAGE_EVENT, {
+//           chatId,
+//           message,
+//         });
+//         // Update the database with the unread message count in the case if user is online and didn't join to the room
+//         await Chat.updateOne(
+//           { _id: chatId },
+//           { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } }
+//         );
+//       }
+//     } else {
+//       // If the user is offline, update the database with the unread message count
+//       logger.debug(`Updating unread message count in DB for user: ${userId}`);
+//       await Chat.updateOne(
+//         { _id: chatId },
+//         { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } }
+//       );
+//     }
+//   });
+// };
+
 const emitEventForNewMessageReceived = async (io, chatId, message) => {
-  // Get all members currently in the room
-  const roomMembers =
-    io.sockets.adapter.rooms.get(chatId.toString()) || new Set();
-  const userIdsInRoom = Array.from(roomMembers).map((socketId) => {
-    const socket = io.sockets.sockets.get(socketId);
-    return socket?.user?._id.toString(); // Extract user ID from socket
-  });
+  try {
+    const chatIdStr = chatId.toString();
 
-  // Fetch all participants of the chat from the database
-  const chat = await Chat.findById(chatId, { participants: 1 }).lean();
-  const chatParticipants =
-    chat?.participants.map((p) => p._id.toString()) || []; // Extract participant IDs
+    // Get all members currently in the room
+    const roomMembers = io.sockets.adapter.rooms.get(chatIdStr) || new Set();
 
-  // Check if all participants are in the room
-  const isAllParticipantsInRoom = chatParticipants.every((id) =>
-    userIdsInRoom.includes(id)
-  );
-
-  if (isAllParticipantsInRoom) {
-    logger.debug(
-      `All participants are in the room. Emitting message received event.`
-    );
-    // Emit message received event to all users in the room if everyone is present
-    io.to(chatId.toString()).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
-      message,
-    });
-    return;
-  }
-
-  // Get all currently connected sockets and their user IDs
-  const allConnectedSockets = Array.from(io.sockets.sockets.keys());
-  const onlineUserIds = allConnectedSockets.map((socketId) => {
-    const socket = io.sockets.sockets.get(socketId);
-    return socket?.user?._id.toString(); // Extract user IDs of online users
-  });
-  // Prepare bulk update operations for unread message count
-  const bulkUpdates = [];
-
-  // Identify participants not currently in the room
-  const userThatAreNotInTheRoom = chatParticipants.filter(
-    (id) => !userIdsInRoom.includes(id)
-  );
-
-  // Identify participants who are in the room
-  const userThatAreInTheRoom = chatParticipants.filter((id) =>
-    userIdsInRoom.includes(id)
-  );
-
-  // Emit message received event to users already in the room
-  userThatAreInTheRoom.forEach((userId) => {
-    io.to(userId).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, {
-      message,
-    });
-  });
-
-  // Handle users not in the room
-  userThatAreNotInTheRoom.forEach(async (userId) => {
-    if (onlineUserIds.includes(userId)) {
-      // If the user is online but not in the room, emit an unread message event
-      const userSocketId = allConnectedSockets.find((socketId) => {
+    // Extract user IDs from sockets in the room
+    const userIdsInRoom = new Set(
+      Array.from(roomMembers).map((socketId) => {
         const socket = io.sockets.sockets.get(socketId);
-        return socket?.user?._id.toString() === userId;
-      });
-      if (userSocketId) {
-        logger.debug(`Emitting unread message event for user: ${userId}`);
-        io.to(userSocketId).emit(ChatEventEnum.UNREAD_MESSAGE_EVENT, {
-          chatId,
-          message,
+        return socket?.user?._id.toString();
+      })
+    );
+
+    // Fetch all participants of the chat
+    const chat = await Chat.findById(chatId, { participants: 1 }).lean();
+    const chatParticipants = new Set(
+      chat?.participants.map((p) => p._id.toString()) || []
+    );
+
+    // Check if all participants are in the room
+    const isAllParticipantsInRoom = [...chatParticipants].every((id) =>
+      userIdsInRoom.has(id)
+    );
+
+    if (isAllParticipantsInRoom) {
+      logger.debug(
+        `All participants are in the room. Emitting message received event.`
+      );
+      io.to(chatIdStr).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, { message });
+      return;
+    }
+
+    // Get all currently connected sockets and their user IDs
+    const allConnectedSockets = Array.from(io.sockets.sockets.keys());
+    const onlineUserIds = new Set(
+      allConnectedSockets.map((socketId) => {
+        const socket = io.sockets.sockets.get(socketId);
+        return socket?.user?._id.toString(); // Extract user IDs of online users
+      })
+    );
+
+    // Identify participants not currently in the room
+    const userThatAreNotInTheRoom = [...chatParticipants].filter(
+      (id) => !userIdsInRoom.has(id)
+    );
+
+    // Identify participants who are in the room
+    const userThatAreInTheRoom = [...chatParticipants].filter((id) =>
+      userIdsInRoom.has(id)
+    );
+
+    // Emit message received event to users already in the room
+    userThatAreInTheRoom.forEach((userId) => {
+      io.to(userId).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, { message });
+    });
+
+    // Prepare bulk update operations for unread message count
+    const bulkUpdates = [];
+
+    for (const userId of userThatAreNotInTheRoom) {
+      if (onlineUserIds.has(userId)) {
+        // Find the user's socket ID
+        const userSocketId = allConnectedSockets.find((socketId) => {
+          const socket = io.sockets.sockets.get(socketId);
+          return socket?.user?._id.toString() === userId;
         });
-        // Update the database with the unread message count in the case if user is online and didn't join to the room
-        bulkUpdates.push({
-          updateOne: {
-            filter: { _id: chatId },
-            update: { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } },
-          },
-        });
-        // Execute bulk update operation
-        if (bulkUpdates.length > 0) {
-          await Chat.bulkWrite(bulkUpdates);
-          bulkUpdates.length = 0; // Clear the array after executing the bulk operation
+
+        if (userSocketId) {
+          logger.debug(
+            `Emitting unread message event for online user: ${userId}`
+          );
+          io.to(userSocketId).emit(ChatEventEnum.UNREAD_MESSAGE_EVENT, {
+            chatId,
+            message,
+          });
+          // Notification handling
+          manageNotifications(io, userSocketId, message);
         }
       }
-    } else {
-      // If the user is offline, update the database with the unread message count
-      logger.debug(`Updating unread message count in DB for user: ${userId}`);
-      await Chat.updateOne(
-        { _id: chatId },
-        { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } }
+
+      // Push bulk update for unread message count
+      bulkUpdates.push({
+        updateOne: {
+          filter: { _id: chatId },
+          update: { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } },
+        },
+      });
+    }
+
+    // Execute bulk update if there are any unread messages to update
+    if (bulkUpdates.length > 0) {
+      await Chat.bulkWrite(bulkUpdates);
+      logger.debug(
+        `Updated unread message count for ${bulkUpdates.length} users.`
       );
     }
-  });
+  } catch (error) {
+    logger.error(`Error in emitting new message event: ${error.message}`);
+  }
+};
+
+// Function to emit the event for unread message count when user first time join to the socket
+const emitUnreadMessageCount = async (io, userId) => {
+  const unreadMessagesQuery = await Chat.aggregate([
+    {
+      $match: {
+        participants: {
+          $elemMatch: {
+            $eq: new mongoose.Types.ObjectId(userId),
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        unreadMessagesCounts: {
+          $ifNull: ["$unreadMessagesCounts." + userId, 0],
+        },
+        _id: 1,
+      },
+    },
+  ]);
+
+  io.to(userId).emit(
+    ChatEventEnum.UNREAD_MESSAGE_COUNT_EVENT,
+    unreadMessagesQuery
+  );
 };
 
 const emitEventForMessageDeleteEitherForEveryoneOrSelf = (
