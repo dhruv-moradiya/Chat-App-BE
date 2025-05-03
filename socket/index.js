@@ -243,8 +243,6 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
             message,
           });
 
-          console.log("message :>> ", message);
-
           // Notification handling
           const socket = io.sockets.sockets.get(userSocketId);
           if (!socket) return; // socket not found

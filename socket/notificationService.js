@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
 import { ChatEventEnum } from "../constants/index.js";
+import Notification from "../models/notification.model.js";
+import { logger } from "../utils/logger.js";
+import { Types } from "mongoose";
 
 const NotificationTypeEnum = {
   MENTION: "MENTION",
@@ -35,7 +38,14 @@ class ManageNotifications {
   }
 
   async #saveNotification(notificationData) {
-    console.log("Saving notification to the database:", notificationData);
+    try {
+      const res = await Notification.create({ ...notificationData });
+
+      console.log("Notification saved successfully.");
+    } catch (error) {
+      console.log("error :>> ", error);
+      logger.error("Error while creating notification data:", error);
+    }
   }
 }
 
@@ -76,42 +86,51 @@ class NotificationDataBuilder {
     const notificationMap = {
       MENTION_WITH_ATTACHMENT: {
         type: NotificationTypeEnum.MENTION,
-        content: `${message.sender.username} mentioned you with an attachment.`,
+        content: `${message.sender.username} has mentioned you with an attachment.`,
       },
       MENTION: {
         type: NotificationTypeEnum.MENTION,
-        content: `${message.sender.username} mentioned you in a message.`,
+        content: `${message.sender.username} has mentioned you in a message.`,
       },
       REACTED: {
         type: NotificationTypeEnum.REACTED,
-        content: `${message.sender.username} reacted to your message.`,
+        content: `${message.sender.username} has reacted to your message.`,
       },
       REPLIED: {
         type: NotificationTypeEnum.REPLIED,
-        content: `${message.sender.username} replied to your message.`,
+        content: `${message.sender.username} has replied to your message.`,
       },
       ATTACHMENT: {
         type: NotificationTypeEnum.ATTACHMENT,
-        content: `${message.sender.username} sent an attachment.`,
+        content: `${message.sender.username}  has send an attachment.`,
       },
       NEW_MESSAGE: {
         type: NotificationTypeEnum.NEW_MESSAGE,
-        content: `${message.sender.username} sent a new message.`,
+        content: `${message.sender.username} has send you a new message.`,
       },
     };
 
     const mapItem = notificationMap[notificationType];
 
     return {
-      _id: tempId,
-      chatId,
-      isRead: false,
-      receivers: userId,
-      messageId: message._id,
-      message: message.content,
-      content: mapItem.content,
-      sender: message.sender._id,
+      sender: new Types.ObjectId(message.sender._id),
+      receivers: new Types.ObjectId(userId),
       notificationType: mapItem.type,
+      content: mapItem.content,
+      message: new Types.ObjectId(message._id),
+      // _id: tempId,
+      // chatId,
+      // isRead: false,
+      // receivers: userId,
+      // messageId: message._id,
+      // message: message.content,
+      // content: mapItem.content,
+      // sender: {
+      //   _id: message.sender._id,
+      //   username: message.sender.username,
+      //   profilePicture: message.sender.profilePicture,
+      // },
+      // notificationType: mapItem.type,
     };
   }
 }

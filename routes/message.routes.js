@@ -17,7 +17,7 @@ import {
   saveAttachmentValidator,
   validate,
 } from "../validator/validator.js";
-import { upload } from "../middleware/multer.middleware.js";
+import { memoryUpload, upload } from "../middleware/multer.middleware.js";
 
 const router = express.Router();
 
@@ -35,7 +35,8 @@ router.post(
 router.post(
   "/save-attachments",
   verifyJWT,
-  upload.fields([{ name: "attachments", maxCount: 4 }]),
+  // upload.fields([{ name: "attachments", maxCount: 4 }]),
+  memoryUpload.array("attachments", 4),
   saveAttachmentValidator(),
   validate,
   saveAttachmentInDatabase

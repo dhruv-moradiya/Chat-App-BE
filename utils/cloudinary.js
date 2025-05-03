@@ -1,5 +1,5 @@
-import fs from "fs";
 import { v2 as cloudinary } from "cloudinary";
+import streamifier from "streamifier";
 
 const configureCloudinary = () => {
   cloudinary.config({
@@ -9,41 +9,37 @@ const configureCloudinary = () => {
   });
 };
 
-const uploadFilesToCloudinary = async (filePaths, userName, publicIds = []) => {
+const uploadFilesToCloudinary = async (buffers, userName, publicIds = []) => {
   try {
     configureCloudinary();
 
-    const uploadPromises = filePaths.map((localPath, index) => {
+    const uploadPromises = buffers.map((buffer, index) => {
       const public_id = publicIds[index] || undefined;
-      return cloudinary.uploader.upload(localPath, {
-        resource_type: "auto",
-        folder: `chat-app/${userName}`,
-        public_id,
+
+      return new Promise((resolve, reject) => {
+        const upload_stream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: "auto",
+            folder: `chat-app/${userName}`,
+            public_id,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        streamifier.createReadStream(buffer).pipe(upload_stream);
       });
     });
 
     const responses = await Promise.all(uploadPromises);
-    filePaths.forEach((localPath) => {
-      try {
-        fs.unlinkSync(localPath);
-      } catch (err) {
-        console.error(`Failed to delete local file: ${localPath}`, err.message);
-      }
-    });
+    console.log("responses :>> ", responses);
 
     console.log("Files uploaded successfully to Cloudinary");
     return responses;
   } catch (error) {
     console.error("Error while uploading files to Cloudinary:", error.message);
-    filePaths.forEach((localPath) => {
-      try {
-        fs.unlinkSync(localPath);
-      } catch (err) {
-        console.error(`Failed to delete local file: ${localPath}`, err.message);
-        throw err;
-      }
-    });
-
     throw error;
   }
 };

@@ -15,11 +15,11 @@ const uploadAttachmentOnCloudinary = (
   req,
   chatId,
   message,
-  attachmentsLocalPath,
+  attachmentsBuffer,
   publicIds
 ) => {
   let attachmentsData = [];
-  uploadFilesToCloudinary(attachmentsLocalPath, req.user.username, publicIds)
+  uploadFilesToCloudinary(attachmentsBuffer, req.user.username, publicIds)
     .then(async (uploadedFiles) => {
       attachmentsData = uploadedFiles.map((file) => ({
         url: file.secure_url,
@@ -370,7 +370,7 @@ const clearChatMessages = asyncHandler(async (req, res, next) => {
 
 const saveAttachmentInDatabase = asyncHandler(async (req, res) => {
   const { chatId, messageId } = req.body;
-  const attachments = req.files?.attachments;
+  const attachments = req?.files && req.files.length > 0 ? req.files : [];
 
   if (!Array.isArray(attachments) || attachments.length === 0) {
     return res
@@ -383,20 +383,22 @@ const saveAttachmentInDatabase = asyncHandler(async (req, res) => {
     return res.status(404).json(new ApiResponse(404, {}, "Message not found"));
   }
 
-  const attachmentsLocalPath = attachments.map((file) => file.path);
+  const attachmentsBuffer = attachments.map((file) => file.buffer);
   const publicIds = attachments.map((file) => file.originalname);
   try {
-    await uploadAttachmentOnCloudinary(
+    const data = await uploadAttachmentOnCloudinary(
       req,
       chatId,
       message,
-      attachmentsLocalPath,
+      attachmentsBuffer,
       publicIds
     );
 
     return res
       .status(200)
-      .json(new ApiResponse(200, {}, "Attachments uploaded successfully"));
+      .json(
+        new ApiResponse(200, { data }, "Attachments uploaded successfully")
+      );
   } catch (error) {
     console.error("Error saving attachment in database:", error);
     return res

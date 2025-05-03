@@ -57,11 +57,13 @@ import userRoutes from "./routes/user.routes.js";
 import chatRoutes from "./routes/chat.routes.js";
 import FriendRequestRoute from "./routes/friendrequest.routes.js";
 import MessagesRoute from "./routes/message.routes.js";
+import NotificationRoute from "./routes/notification.routes.js";
 
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/friendrequest", FriendRequestRoute);
 app.use("/api/v1/message", MessagesRoute);
+app.use("/api/v1/notification", NotificationRoute);
 
 // Socket.IO Initialization
 initializeSocket(io);
