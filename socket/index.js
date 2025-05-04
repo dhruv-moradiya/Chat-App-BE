@@ -169,6 +169,7 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
   try {
     const chatIdStr = chatId.toString();
 
+    // * io.sockets.adapter.rooms.get(chatId.toString()) This will only provide sockets IDs ||  io.sockets.sockets.get(socketId) This will provide that socket's info that we have add at time when user join in the room via their user ID
     // Get all members currently in the room
     const roomMembers = io.sockets.adapter.rooms.get(chatIdStr) || new Set();
 
@@ -229,6 +230,8 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
     for (const userId of userThatAreNotInTheRoom) {
       if (onlineUserIds.has(userId)) {
         // Find the user's socket ID
+
+        // TODO: No need for this loop and handle offline user to save notification in the DB
         const userSocketId = allConnectedSockets.find((socketId) => {
           const socket = io.sockets.sockets.get(socketId);
           return socket?.user?._id.toString() === userId;

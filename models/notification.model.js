@@ -29,16 +29,6 @@ const NotificationSchema = new mongoose.Schema(
 
     message: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
 
-    attachments: [
-      {
-        url: { type: String },
-        fileType: {
-          type: String,
-          enum: ["image", "video", "document", "audio"],
-        },
-      },
-    ],
-
     isRead: { type: Boolean, default: false },
   },
   { timestamps: true }

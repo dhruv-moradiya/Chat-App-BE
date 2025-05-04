@@ -63,7 +63,7 @@ app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/friendrequest", FriendRequestRoute);
 app.use("/api/v1/message", MessagesRoute);
-app.use("/api/v1/notification", NotificationRoute);
+app.use("/api/v1/notifications", NotificationRoute);
 
 // Socket.IO Initialization
 initializeSocket(io);
