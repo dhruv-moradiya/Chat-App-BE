@@ -10,6 +10,52 @@ import { areArraysEqual } from "../utils/helpers.js";
 import Message from "../models/message.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ManageNotifications } from "./notificationService.js";
+import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
+
+const uploadAttachmentOnCloudinary = (
+  io,
+  user,
+  chatId,
+  message,
+  attachmentsBuffer,
+  publicIds
+) => {
+  let attachmentsData = [];
+  uploadFilesToCloudinary(attachmentsBuffer, user.username, publicIds)
+    .then(async (uploadedFiles) => {
+      attachmentsData = uploadedFiles.map((file) => ({
+        url: file.secure_url,
+        fileName: file.original_filename,
+        publicId: file.public_id,
+      }));
+
+      const updatedMessage = await Message.findOneAndUpdate(
+        { _id: message._id },
+        { $set: { attachments: attachmentsData } },
+        { new: true }
+      );
+
+      const messageResponseForSocket = {
+        ...updatedMessage.toObject(),
+        sender: user,
+      };
+
+      emitEventForUpdatedMessageWithAttachment(
+        io,
+        chatId,
+        messageResponseForSocket
+      );
+    })
+    .catch((err) => {
+      console.error("Error uploading files to Cloudinary:", err);
+      attachmentsData = [];
+
+      throw createError.internalServerError(
+        500,
+        "Failed to upload files to Cloudinary"
+      );
+    });
+};
 
 const emitError = (socket, error) => {
   socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, error);
@@ -73,28 +119,29 @@ const emitEventForUpdatedMessageWithAttachment = (io, chatId, message) => {
 
 const listeningForMessageSendEvent = (io, socket) => {
   socket.on(ChatEventEnum.MESSAGE_SEND_EVENT, async ({ messageData }) => {
-    const { chatId, content, replyTo, isAttachment, mentionedUsers } =
+    console.log("messageData :>> ", messageData);
+    const { chatId, content, replyTo, attachments, mentionedUsers } =
       messageData;
     const senderId = socket.user._id;
 
     const tempId = new mongoose.Types.ObjectId();
     const createdAt = new Date().toISOString();
 
-    const message = {
-      _id: tempId,
-      sender: socket.user,
-      chat: chatId,
-      content: content || "",
-      createdAt,
-      updatedAt: createdAt,
-      isPending: true,
-      attachments: [],
-      deletedBy: [],
-      reactions: [],
-      ...(mentionedUsers && { mentionedUsers }),
-      ...(isAttachment && { isAttachment }),
-      ...(replyTo && { replyTo }),
-    };
+    // const message = {
+    //   _id: tempId,
+    //   sender: socket.user,
+    //   chat: chatId,
+    //   content: content || "",
+    //   createdAt,
+    //   updatedAt: createdAt,
+    //   isPending: true,
+    //   attachments: [],
+    //   deletedBy: [],
+    //   reactions: [],
+    //   ...(mentionedUsers && { mentionedUsers }),
+    //   ...(isAttachment && { isAttachment }),
+    //   ...(replyTo && { replyTo }),
+    // };
 
     // Emit message received event to all users in the room
     // emitEventForNewMessageReceived(io, chatId, message);
@@ -115,9 +162,24 @@ const listeningForMessageSendEvent = (io, socket) => {
       emitEventForNewMessageReceived(io, chatId, {
         ...message.toObject(),
         sender: socket.user,
-        ...(isAttachment && { isAttachment }),
-        // isPending: false,
+        ...(attachments && { isAttachment: true }),
       });
+
+      if (attachments && attachments.length > 0) {
+        uploadAttachmentOnCloudinary(
+          io,
+          socket.user,
+          chatId,
+          message,
+          attachments.map((file) =>
+            Buffer.from(file.replace(/^data:.+;base64,/, ""), "base64")
+          ),
+          attachments.map(
+            (_, index) =>
+              `/messageId/${tempId}/${index}/${socket.user.username}`
+          )
+        );
+      }
     } catch (error) {
       emitError(socket, "Error while sending the message.");
     }
