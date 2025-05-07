@@ -4,12 +4,11 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 import { createError } from "../utils/ApiError.js";
+import Chat from "../models/chat.model.js";
 import {
-  emitEventForMessageDeleteEitherForEveryoneOrSelf,
   emitEventForNewMessageReceived,
   emitEventForUpdatedMessageWithAttachment,
-} from "../socket/index.js";
-import Chat from "../models/chat.model.js";
+} from "../socket/message.socket.js";
 
 const uploadAttachmentOnCloudinary = (
   req,

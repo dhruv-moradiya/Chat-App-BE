@@ -1,61 +1,21 @@
 import cookie from "cookie";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
+import Chat from "../models/chat.model.js";
 import User from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
-import { ChatEventEnum } from "../constants/index.js";
-import { logger } from "../utils/logger.js";
-import Chat from "../models/chat.model.js";
-import mongoose from "mongoose";
-import { areArraysEqual } from "../utils/helpers.js";
 import Message from "../models/message.model.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
+import { logger } from "../utils/logger.js";
+import { ChatEventEnum } from "../constants/index.js";
 import { ManageNotifications } from "./notificationService.js";
 import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
-
-const uploadAttachmentOnCloudinary = (
-  io,
-  user,
-  chatId,
-  message,
-  attachmentsBuffer,
-  publicIds
-) => {
-  let attachmentsData = [];
-  uploadFilesToCloudinary(attachmentsBuffer, user.username, publicIds)
-    .then(async (uploadedFiles) => {
-      attachmentsData = uploadedFiles.map((file) => ({
-        url: file.secure_url,
-        fileName: file.original_filename,
-        publicId: file.public_id,
-      }));
-
-      const updatedMessage = await Message.findOneAndUpdate(
-        { _id: message._id },
-        { $set: { attachments: attachmentsData } },
-        { new: true }
-      );
-
-      const messageResponseForSocket = {
-        ...updatedMessage.toObject(),
-        sender: user,
-      };
-
-      emitEventForUpdatedMessageWithAttachment(
-        io,
-        chatId,
-        messageResponseForSocket
-      );
-    })
-    .catch((err) => {
-      console.error("Error uploading files to Cloudinary:", err);
-      attachmentsData = [];
-
-      throw createError.internalServerError(
-        500,
-        "Failed to upload files to Cloudinary"
-      );
-    });
-};
+import { stripBase64Prefix } from "../utils/helpers.js";
+import handleAuth from "./auth.socket.js";
+import {
+  listenForCurrentActiveChat,
+  listenForLeaveChatEvent,
+} from "./chat.socket.js";
+import { listeningForMessageSendEvent } from "./message.socket.js";
 
 const emitError = (socket, error) => {
   socket.emit(ChatEventEnum.SOCKET_ERROR_EVENT, error);
@@ -72,117 +32,6 @@ const mountParticipantStopTypingEvent = (socket) => {
   socket.on(ChatEventEnum.STOP_TYPING_EVENT, (chatId) => {
     console.log(`User stopped typing. chatId: `, chatId);
     socket.to(chatId).emit(ChatEventEnum.STOP_TYPING_EVENT, chatId);
-  });
-};
-
-const listenForLeaveChatEvent = (io, socket) => {
-  socket.on(ChatEventEnum.LEAVE_CHAT_EVENT, (chatId) => {
-    console.log(`User left the chat. chatId: `, chatId);
-    socket.leave(chatId);
-  });
-};
-
-const listenForCurrentActiveChat = (io, socket) => {
-  socket.on(
-    ChatEventEnum.CURRENT_ACTIVE_CHAT_EVENT,
-    async ({ chatId, userData }) => {
-      // TODO: Add validation for chatId and userData
-      if (!chatId || !userData?._id || !userData?.username) {
-        logger.error("Chat ID and user data are required.");
-        return;
-      }
-
-      const userId = userData._id;
-      const userName = userData.username;
-
-      io.to(userId).socketsJoin(chatId);
-      logger.info(`${userName} joined to chat room: ${chatId}`);
-
-      io.to(chatId).emit(ChatEventEnum.ROOM_CREATED_EVENT, {
-        chatId,
-        userName,
-      });
-
-      await Chat.updateOne(
-        { _id: chatId },
-        { $set: { [`unreadMessagesCounts.${userId}`]: 0 } }
-      );
-    }
-  );
-};
-
-const emitEventForUpdatedMessageWithAttachment = (io, chatId, message) => {
-  io.to(chatId).emit(ChatEventEnum.UPDATED_MESSAGE_WITH_ATTACHMENT_EVENT, {
-    message,
-  });
-};
-
-const listeningForMessageSendEvent = (io, socket) => {
-  socket.on(ChatEventEnum.MESSAGE_SEND_EVENT, async ({ messageData }) => {
-    console.log("messageData :>> ", messageData);
-    const { chatId, content, replyTo, attachments, mentionedUsers } =
-      messageData;
-    const senderId = socket.user._id;
-
-    const tempId = new mongoose.Types.ObjectId();
-    const createdAt = new Date().toISOString();
-
-    // const message = {
-    //   _id: tempId,
-    //   sender: socket.user,
-    //   chat: chatId,
-    //   content: content || "",
-    //   createdAt,
-    //   updatedAt: createdAt,
-    //   isPending: true,
-    //   attachments: [],
-    //   deletedBy: [],
-    //   reactions: [],
-    //   ...(mentionedUsers && { mentionedUsers }),
-    //   ...(isAttachment && { isAttachment }),
-    //   ...(replyTo && { replyTo }),
-    // };
-
-    // Emit message received event to all users in the room
-    // emitEventForNewMessageReceived(io, chatId, message);
-
-    try {
-      const newMessageData = {
-        _id: tempId,
-        sender: senderId,
-        chat: chatId,
-        content: content || "",
-        createdAt,
-        ...(mentionedUsers && { mentionedUsers }),
-        ...(replyTo && { replyTo }),
-      };
-
-      const message = await Message.create(newMessageData);
-
-      emitEventForNewMessageReceived(io, chatId, {
-        ...message.toObject(),
-        sender: socket.user,
-        ...(attachments && { isAttachment: true }),
-      });
-
-      if (attachments && attachments.length > 0) {
-        uploadAttachmentOnCloudinary(
-          io,
-          socket.user,
-          chatId,
-          message,
-          attachments.map((file) =>
-            Buffer.from(file.replace(/^data:.+;base64,/, ""), "base64")
-          ),
-          attachments.map(
-            (_, index) =>
-              `/messageId/${tempId}/${index}/${socket.user.username}`
-          )
-        );
-      }
-    } catch (error) {
-      emitError(socket, "Error while sending the message.");
-    }
   });
 };
 
@@ -227,176 +76,10 @@ const listeningForMessageReactionEvent = (io, socket) => {
   );
 };
 
-const emitEventForNewMessageReceived = async (io, chatId, message) => {
-  try {
-    const chatIdStr = chatId.toString();
-
-    // * io.sockets.adapter.rooms.get(chatId.toString()) This will only provide sockets IDs ||  io.sockets.sockets.get(socketId) This will provide that socket's info that we have add at time when user join in the room via their user ID
-    // Get all members currently in the room
-    const roomMembers = io.sockets.adapter.rooms.get(chatIdStr) || new Set();
-
-    // Extract user IDs from sockets in the room
-    const userIdsInRoom = new Set(
-      Array.from(roomMembers).map((socketId) => {
-        const socket = io.sockets.sockets.get(socketId);
-        return socket?.user?._id.toString();
-      })
-    );
-
-    // Fetch all participants of the chat
-    const chat = await Chat.findById(chatId, { participants: 1 }).lean();
-    const chatParticipants = new Set(
-      chat?.participants.map((p) => p._id.toString()) || []
-    );
-
-    // Check if all participants are in the room
-    const isAllParticipantsInRoom = [...chatParticipants].every((id) =>
-      userIdsInRoom.has(id)
-    );
-
-    if (isAllParticipantsInRoom) {
-      logger.debug(
-        `All participants are in the room. Emitting message received event.`
-      );
-      io.to(chatIdStr).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, { message });
-      return;
-    }
-
-    // Get all currently connected sockets and their user IDs
-    const allConnectedSockets = Array.from(io.sockets.sockets.keys());
-    const onlineUserIds = new Set(
-      allConnectedSockets.map((socketId) => {
-        const socket = io.sockets.sockets.get(socketId);
-        return socket?.user?._id.toString(); // Extract user IDs of online users
-      })
-    );
-
-    // Identify participants not currently in the room
-    const userThatAreNotInTheRoom = [...chatParticipants].filter(
-      (id) => !userIdsInRoom.has(id)
-    );
-
-    // Identify participants who are in the room
-    const userThatAreInTheRoom = [...chatParticipants].filter((id) =>
-      userIdsInRoom.has(id)
-    );
-
-    // Emit message received event to users already in the room
-    userThatAreInTheRoom.forEach((userId) => {
-      io.to(userId).emit(ChatEventEnum.MESSAGE_RECEIVED_EVENT, { message });
-    });
-
-    // Prepare bulk update operations for unread message count
-    const bulkUpdates = [];
-
-    for (const userId of userThatAreNotInTheRoom) {
-      if (onlineUserIds.has(userId)) {
-        // Find the user's socket ID
-
-        // TODO: No need for this loop and handle offline user to save notification in the DB
-        const userSocketId = allConnectedSockets.find((socketId) => {
-          const socket = io.sockets.sockets.get(socketId);
-          return socket?.user?._id.toString() === userId;
-        });
-
-        if (userSocketId) {
-          logger.debug(
-            `Emitting unread message event for online user: ${userId}`
-          );
-          io.to(userSocketId).emit(ChatEventEnum.UNREAD_MESSAGE_EVENT, {
-            chatId,
-            message,
-          });
-
-          // Notification handling
-          const socket = io.sockets.sockets.get(userSocketId);
-          if (!socket) return; // socket not found
-
-          const userIdForNotification = socket.user?._id.toString();
-          const manageNotification = new ManageNotifications(
-            io,
-            userSocketId,
-            message
-          );
-          await manageNotification.sendNotification(userIdForNotification);
-        }
-      }
-
-      // Push bulk update for unread message count
-      bulkUpdates.push({
-        updateOne: {
-          filter: { _id: chatId },
-          update: { $inc: { [`unreadMessagesCounts.${userId}`]: 1 } },
-        },
-      });
-    }
-
-    // Execute bulk update if there are any unread messages to update
-    if (bulkUpdates.length > 0) {
-      await Chat.bulkWrite(bulkUpdates);
-      logger.debug(
-        `Updated unread message count for ${bulkUpdates.length} users.`
-      );
-    }
-  } catch (error) {
-    logger.error(`Error in emitting new message event: ${error.message}`);
-  }
-};
-
-const emitEventForMessageDeleteEitherForEveryoneOrSelf = (
-  io,
-  chatId,
-  userId,
-  isDeletedForAll,
-  messageIds
-) => {
-  if (isDeletedForAll) {
-    io.to(chatId.toString()).emit(
-      ChatEventEnum.DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT,
-      {
-        chatId,
-        messageIds,
-        deletedBy: userId,
-        isDeletedForAll,
-      }
-    );
-  } else {
-    io.to(userId).emit(
-      ChatEventEnum.DELETE_MESSAGE_FOR_EVERYONE_OR_SELF_EVENT,
-      {
-        chatId,
-        messageIds,
-        deletedBy: userId,
-        isDeletedForAll,
-      }
-    );
-  }
-};
-
 const initializeSocket = (io) => {
   return io.on("connection", async (socket) => {
     try {
-      const cookies = cookie.parse(socket.handshake.headers.cookie || "");
-
-      let token = cookies.token;
-      if (!token) {
-        token = socket.handshake.auth.token;
-      }
-
-      if (!token) {
-        throw new ApiError(401, "Un-authorized handshake. Token is missing");
-      }
-
-      const decoded = await jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-      const user = await User.findOne({ _id: decoded._id }).select(
-        "-password -refreshToken -__v"
-      );
-
-      if (!user) {
-        throw new ApiError(401, "Un-authorized handshake. User is missing");
-      }
-
-      socket.join(user._id.toString());
+      const user = await handleAuth(socket);
       socket.user = user;
 
       socket.emit(
@@ -415,7 +98,6 @@ const initializeSocket = (io) => {
       listenForCurrentActiveChat(io, socket);
       listeningForMessageSendEvent(io, socket);
       listeningForMessageReactionEvent(io, socket);
-      // emitUnreadMessageCount(io, user._id.toString());
 
       socket.on(ChatEventEnum.DISCONNECT_EVENT, () => {
         logger.info(
@@ -438,9 +120,4 @@ const initializeSocket = (io) => {
   });
 };
 
-export {
-  initializeSocket,
-  emitEventForNewMessageReceived,
-  emitEventForUpdatedMessageWithAttachment,
-  emitEventForMessageDeleteEitherForEveryoneOrSelf,
-};
+export { emitError, initializeSocket };

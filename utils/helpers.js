@@ -15,4 +15,8 @@ const areArraysEqual = (arr1, arr2) => {
   return true;
 };
 
-export { areArraysEqual };
+const stripBase64Prefix = (base64String) => {
+  return base64String.replace(/^data:.+;base64,/, "");
+};
+
+export { areArraysEqual, stripBase64Prefix };
