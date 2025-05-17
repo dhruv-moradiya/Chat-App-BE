@@ -13,25 +13,54 @@ const NotificationSchema = new mongoose.Schema(
       required: true,
     },
 
-    notificationType: {
+    type: {
       type: String,
       enum: [
-        "NEW_MESSAGE",
-        "MENTION",
-        "ATTACHMENT",
-        "REPLIED",
-        "APP_NOTIFICATION",
+        "mention_with_attachment",
+        "new_message",
+        "mention",
+        "attachment",
+        "replied",
+        "friend_request",
+        "friend_request_accepted",
+        "friend_request_rejected",
+        "reacted",
+        "app_notification",
       ],
       required: true,
     },
 
     content: { type: String, required: true },
 
-    message: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
+    subContent: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: false,
+      refPath: "subContentModel",
+    },
+
+    subContentModel: {
+      type: String,
+      required: false,
+      enum: ["Message", "FriendRequest"],
+    },
 
     isRead: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      transform: function (doc, ret) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+    toObject: {
+      transform: function (doc, ret) {
+        delete ret.__v;
+        return ret;
+      },
+    },
+  }
 );
 
 const Notification = mongoose.model("Notification", NotificationSchema);

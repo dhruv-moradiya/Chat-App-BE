@@ -6,6 +6,7 @@ import { createError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ChatEventEnum } from "../constants/index.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { sendNotification } from "../socket/notification.socket.js";
 
 // SEND FRIEND REQUEST
 const sendFriendRequest = asyncHandler(async (req, res) => {
@@ -184,6 +185,14 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+
+    sendNotification(
+      "friend_request_accepted",
+      friendRequest.to,
+      friendRequestId,
+      "FriendRequest",
+      req.app.get("io")
+    );
 
     req.app
       .get("io")

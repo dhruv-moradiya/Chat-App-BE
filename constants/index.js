@@ -22,6 +22,32 @@ const PROFILE_PICS = [
   "https://i.pinimg.com/474x/a6/37/2c/a6372caecdd8ba4eeebdd18a2c9faf94.jpg",
   "https://i.pinimg.com/474x/33/fb/eb/33fbeb45315109aa81ed6a7d1551552c.jpg",
   "https://i.pinimg.com/474x/fd/c1/f0/fdc1f0ae43373e8753e8abf6e7cf7091.jpg",
+  "https://i.pinimg.com/736x/8c/66/23/8c662358d867966657a6118734ca98d1.jpg",
+  "https://i.pinimg.com/736x/8a/e6/d2/8ae6d29abeb2e7eacae806d7a5e13c3b.jpg",
+  "https://i.pinimg.com/736x/89/1d/ab/891dab0d971257580be08839de537fc5.jpg",
+  "https://i.pinimg.com/736x/22/0a/dc/220adc665e49ee04d15e36728d059f4e.jpg",
+  "https://i.pinimg.com/736x/a6/05/7e/a6057e6d925b2560c3e4e820419e7d17.jpg",
+  "https://i.pinimg.com/736x/3c/4a/e4/3c4ae460ccc9d1d625c406d454693b76.jpg",
+  "https://i.pinimg.com/736x/be/f7/9c/bef79c786120e5668982a8c280eca573.jpg",
+  "https://i.pinimg.com/736x/ab/f3/3b/abf33b481a105643097168fc0243be6f.jpg",
+  "https://i.pinimg.com/736x/6a/00/23/6a002386ea78db021976d0e4bcb6d76a.jpg",
+  "https://i.pinimg.com/736x/fa/36/21/fa36219616d8cceb59c0a7c0519fb316.jpg",
+  "https://i.pinimg.com/736x/e4/4a/db/e44adba2a2eadc97952121fbf75f1ec8.jpg",
+  "https://i.pinimg.com/736x/55/bf/9a/55bf9a78e93732272965d9b95d33ceab.jpg",
+  "https://i.pinimg.com/736x/46/a2/df/46a2df4a2ab2c150cfd864dc9f90186d.jpg",
+  "https://i.pinimg.com/736x/91/80/46/9180464bb4c672ce1a081076ec8f4619.jpg",
+  "https://i.pinimg.com/736x/dd/eb/37/ddeb372120560fffecafcca2dfcc30a1.jpg",
+  "https://i.pinimg.com/736x/1e/a4/82/1ea482b79e4781e62a440c036e82bdf5.jpg",
+  "https://i.pinimg.com/736x/78/e6/cf/78e6cf22df3dce593661888bba82add1.jpg",
+  "https://i.pinimg.com/474x/7c/22/e0/7c22e0b5d6cd7e71419b92244d801266.jpg",
+  "https://i.pinimg.com/474x/76/83/46/768346c82bf1fd11e3cee503f13cf57a.jpg",
+  "https://i.pinimg.com/736x/1b/9d/1b/1b9d1b24140f05b987c9bda1a6f10fa5.jpg",
+  "https://i.pinimg.com/736x/11/48/01/1148010bc6df885075a558384b3dbc6b.jpg",
+  "https://i.pinimg.com/736x/d4/db/31/d4db3148c5c5f8906a86d076a8cc1003.jpg",
+  "https://i.pinimg.com/736x/a5/9a/08/a59a0818efb684808d235bf3b2a84ca9.jpg",
+  "https://i.pinimg.com/736x/54/bf/34/54bf340d7c6d3ce855c9a4cc9c1c114d.jpg",
+  "https://i.pinimg.com/736x/77/83/37/778337851def4eea5ef7743859b64250.jpg",
+  "https://i.pinimg.com/736x/c6/39/09/c6390947f2099284a1e4bb35abf8355c.jpg",
 ];
 
 const ChatEventEnum = Object.freeze({
@@ -91,4 +117,16 @@ const ChatEventEnum = Object.freeze({
   NOTIFICATION_EVENT: "notification",
 });
 
-export { PROFILE_PICS, ChatEventEnum };
+const NOTIFICATION_TYPES = Object.freeze({
+  NEW_MESSAGE: "new_message",
+  MENTION: "mention",
+  ATTACHMENT: "attachment",
+  REPLIED: "replied",
+  FRIEND_REQUEST: "friend_request",
+  FRIEND_REQUEST_ACCEPTED: "friend_request_accepted",
+  FRIEND_REQUEST_REJECTED: "friend_request_rejected",
+  REACTED: "reacted",
+  APP_NOTIFICATION: "app_notification",
+});
+
+export { PROFILE_PICS, ChatEventEnum, NOTIFICATION_TYPES };

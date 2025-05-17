@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import { logger } from "../utils/logger.js";
 import Chat from "../models/chat.model.js";
 import { ManageNotifications } from "./notificationService.js";
+import { sendNotification } from "./notification.socket.js";
 
 // Upload attachments to Cloudinary and update the message in the database and emit the updated message event to the chat room.
 const uploadAttachmentOnCloudinary = (
@@ -190,34 +191,18 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
 
     for (const userId of userThatAreNotInTheRoom) {
       if (onlineUserIds.has(userId)) {
-        // Find the user's socket ID
-
-        // TODO: No need for this loop and handle offline user to save notification in the DB
-        const userSocketId = allConnectedSockets.find((socketId) => {
-          const socket = io.sockets.sockets.get(socketId);
-          return socket?.user?._id.toString() === userId;
-        });
-
-        if (userSocketId) {
+        if (userId) {
           logger.debug(
             `Emitting unread message event for online user: ${userId}`
           );
-          io.to(userSocketId).emit(ChatEventEnum.UNREAD_MESSAGE_EVENT, {
+          io.to(userId).emit(ChatEventEnum.UNREAD_MESSAGE_EVENT, {
             chatId,
             message,
           });
 
-          // Notification handling
-          const socket = io.sockets.sockets.get(userSocketId);
-          if (!socket) return; // socket not found
-
-          const userIdForNotification = socket.user?._id.toString();
-          const manageNotification = new ManageNotifications(
-            io,
-            userSocketId,
-            message
-          );
-          await manageNotification.sendNotification(userIdForNotification);
+          sendNotification("new_message", userId, message._id, "Message", io, {
+            isAttachment: message?.isAttachment,
+          });
         }
       }
 
@@ -232,7 +217,7 @@ const emitEventForNewMessageReceived = async (io, chatId, message) => {
 
     // Execute bulk update if there are any unread messages to update
     if (bulkUpdates.length > 0) {
-      await ChatManageNotifications.bulkWrite(bulkUpdates);
+      await Chat.bulkWrite(bulkUpdates);
       logger.debug(
         `Updated unread message count for ${bulkUpdates.length} users.`
       );
