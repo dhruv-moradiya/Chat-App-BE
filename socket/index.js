@@ -39,24 +39,24 @@ const listeningForMessageReactionEvent = (io, socket) => {
   socket.on(
     ChatEventEnum.MESSAGE_REACT_EVENT,
     async ({ chatId, messageId, emoji, userId }) => {
-      socket.broadcast.to(chatId).emit(ChatEventEnum.MESSAGE_REACT_EVENT, {
-        chatId,
-        messageId,
-        emoji,
-        userId,
-      });
+      // socket.broadcast.to(chatId).emit(ChatEventEnum.MESSAGE_REACT_EVENT, {
+      //   chatId,
+      //   messageId,
+      //   emoji,
+      //   userId,
+      // });
       try {
-        const updatedMessage = await Message.findOneAndUpdate(
-          { _id: messageId },
-          { $push: { reactions: { userId, emoji } } },
-          { new: true, upsert: false }
-        );
+        // const updatedMessage = await Message.findOneAndUpdate(
+        //   { _id: messageId },
+        //   { $push: { reactions: { userId, emoji } } },
+        //   { new: true, upsert: false }
+        // );
 
-        if (!updatedMessage) {
-          return socket.emit(ChatEventEnum.ERROR_EVENT, {
-            message: "Message not found.",
-          });
-        }
+        // if (!updatedMessage) {
+        //   return socket.emit(ChatEventEnum.ERROR_EVENT, {
+        //     message: "Message not found.",
+        //   });
+        // }
 
         socket.broadcast.to(chatId).emit(ChatEventEnum.MESSAGE_REACT_EVENT, {
           chatId,
