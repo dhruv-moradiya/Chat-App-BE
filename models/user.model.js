@@ -10,6 +10,8 @@ const UserSchema = new mongoose.Schema(
     profilePicture: { type: String },
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     mutedChats: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chat" }],
+    pinnedChats: [{ type: mongoose.Schema.Types.ObjectId, ref: "Chat" }],
+    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     refreshToken: {
       type: String,
     },

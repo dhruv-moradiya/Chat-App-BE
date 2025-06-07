@@ -4,6 +4,7 @@ import {
   createGroupChat,
   createOneOnOneChat,
   getMyChats,
+  pinChat,
   removeParticipantFromGroupChat,
 } from "../controllers/chat.controller.js";
 import {
@@ -49,6 +50,8 @@ router.post(
   validate,
   removeParticipantFromGroupChat
 );
+
+router.patch("/pin-chat", verifyJWT, pinChat);
 
 router.get("/my-chats", verifyJWT, getMyChats);
 

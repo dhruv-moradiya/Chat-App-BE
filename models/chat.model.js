@@ -22,6 +22,7 @@ const ChatSchema = new mongoose.Schema(
       default: new Map(),
     },
     admin: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
   },
   { timestamps: true }
 );

@@ -239,10 +239,42 @@ const getMyChats = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, chats, "Chats fetched successfully"));
 });
 
+const pinChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.body;
+
+  const chat = await Chat.findById(chatId);
+
+  if (!chat) {
+    throw createError.notFound("Chat not found");
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (user.pinnedChats.includes(chatId)) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Chat already pinned"));
+  }
+
+  const result = await User.findByIdAndUpdate(req.user._id, {
+    $push: { pinnedChats: chatId },
+  });
+
+  if (!result) {
+    throw createError.internalServerError("Failed to pin chat");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { chatId: chatId }, "Chat pinned successfully"));
+});
+
 export {
   createOneOnOneChat,
   getMyChats,
   createGroupChat,
   addParticipantInGroupChat,
   removeParticipantFromGroupChat,
+  pinChat,
 };
+// https://pattern-craft.vercel.app/

@@ -1,13 +1,12 @@
-import { emitError } from "./index.js";
-import { ChatEventEnum } from "../constants/index.js";
-import Message from "../models/message.model.js";
-import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
-import { stripBase64Prefix } from "../utils/helpers.js";
 import mongoose from "mongoose";
-import { logger } from "../utils/logger.js";
 import Chat from "../models/chat.model.js";
-import { ManageNotifications } from "./notificationService.js";
-import { sendNotification } from "./notification.socket.js";
+import Message from "../models/message.model.js";
+
+import { emitError } from "./index.js";
+import { logger } from "../utils/logger.js";
+import { ChatEventEnum } from "../constants/index.js";
+import { stripBase64Prefix } from "../utils/helpers.js";
+import { uploadFilesToCloudinary } from "../utils/cloudinary.js";
 
 // Upload attachments to Cloudinary and update the message in the database and emit the updated message event to the chat room.
 const uploadAttachmentOnCloudinary = (
